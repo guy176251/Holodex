@@ -1,7 +1,7 @@
 <template>
   <span class="EntryContainer">
-    {{ TimeStamp }} :
-    <span :style="TextStyle">
+    {{ timeStamp }} :
+    <span :style="textStyle">
       {{ stext }}
     </span>
   </span>
@@ -29,10 +29,10 @@ export default {
         },
     },
     computed: {
-        TimeStamp() {
+        timeStamp() {
             return new Date(this.time).toTimeString().split(" ")[0];
         },
-        TextStyle() {
+        textStyle() {
             return {
                 "-webkit-text-fill-color": (this.cc === "") ? "unset" : this.cc,
                 "-webkit-text-stroke-color": (this.oc === "") ? "unset" : this.oc,

@@ -1,14 +1,14 @@
 <template>
   <v-container fill-height>
     <v-card
-      v-if="MenuBool"
+      v-if="menuBool"
       class="TopMenu"
     >
       <v-container class="d-flex align-baseline">
         <v-btn
           elevation="4"
           color="secondary"
-          @click="ModalMode = 3; ModalNexus = true"
+          @click="modalMode = 3; modalNexus = true"
         >
           Setting
         </v-btn>
@@ -19,7 +19,7 @@
         <v-btn
           elevation="4"
           color="secondary"
-          @click="ModalMode = 4; ModalNexus = true; ActiveURLStream = '';"
+          @click="modalMode = 4; modalNexus = true; activeURLStream = '';"
         >
           Sync Chat
         </v-btn>
@@ -27,7 +27,7 @@
           elevation="4"
           color="secondary"
           style="margin-left:5px"
-          @click="ModalMode = 5; ModalNexus = true"
+          @click="modalMode = 5; modalNexus = true"
         >
           UnSync Chat
         </v-btn>
@@ -39,15 +39,15 @@
         elevation="4"
         color="primary"
         small
-        @click="MenuBool = !MenuBool"
+        @click="menuBool = !menuBool"
       >
         Menu
       </v-btn>
-      <div class="d-flex align-stretch flex-row" style="height:100%" @click="MenuBool = false">
+      <div class="d-flex align-stretch flex-row" style="height:100%" @click="menuBool = false">
         <v-card class="ChatOuterContainer grow" height="100%;" width="auto">
           <v-container class="ChatInnerContainer d-flex flex-column">
             <EnhancedEntry
-              v-for="(dt, index) in Entries"
+              v-for="(dt, index) in entries"
               :key="index"
               :time="dt.Time"
               :stext="dt.SText"
@@ -55,32 +55,32 @@
               :o-c="dt.OC"
             />
           </v-container>
-          <v-card v-if="ProfileDisplay" class="ProfileListCard d-flex flex-column">
-            <span v-for="(prf, index) in Profile" :key="index"><span v-if="index === ProfileIdx">> </span>{{ (index + 1) + '. ' + prf.Name }}</span>
+          <v-card v-if="profileDisplay" class="ProfileListCard d-flex flex-column">
+            <span v-for="(prf, index) in profile" :key="index"><span v-if="index === profileIdx">> </span>{{ (index + 1) + '. ' + prf.Name }}</span>
           </v-card>
         </v-card>
         <v-card
-          v-if="ActiveChat.length > 0"
+          v-if="activeChat.length > 0"
           class="ChatPanelContainer"
           height="100%"
-          :width="ActiveChat.length < 2 ? '50%' : '70%'"
-          :style="ActiveChatGridRow"
+          :width="activeChat.length < 2 ? '50%' : '70%'"
+          :style="activeChatGridRow"
           outlined
         >
           <v-card
-            v-for="(ChatURL, index) in ActiveChat"
+            v-for="(ChatURL, index) in activeChat"
             :key="ChatURL.text"
             class="d-flex flex-column"
             outlined
           >
             <p class="text-center" style="margin-top: 5px">
               {{ ChatURL.text }}
-              <v-icon class="float-right" @click="CloseActiveChat(index)">
+              <v-icon class="float-right" @click="closeActiveChat(index)">
                 {{ mdiCloseCircle }}
               </v-icon>
             </p>
             <iframe
-              class="ActiveChatIFrame"
+              class="activeChatIFrame"
               :src="URLExtender(ChatURL.text)"
               frameborder="0"
               @load="IFrameLoaded($event, ChatURL.text)"
@@ -90,34 +90,34 @@
       </div>
 
       <v-container
-        @click="MenuBool = false"
-        @keydown.up.exact="ProfileUp()"
-        @keydown.down.exact="ProfileDown()"
-        @keydown.tab.exact.prevent="ProfileDown()"
-        @keydown.shift.tab.exact.prevent="ProfileJumpToDefault()"
-        @keydown.ctrl.49.exact.prevent="ProfileJump(0)"
-        @keydown.ctrl.50.exact.prevent="ProfileJump(1)"
-        @keydown.ctrl.51.exact.prevent="ProfileJump(2)"
-        @keydown.ctrl.52.exact.prevent="ProfileJump(3)"
-        @keydown.ctrl.53.exact.prevent="ProfileJump(4)"
-        @keydown.ctrl.54.exact.prevent="ProfileJump(5)"
-        @keydown.ctrl.55.exact.prevent="ProfileJump(6)"
-        @keydown.ctrl.56.exact.prevent="ProfileJump(7)"
-        @keydown.ctrl.57.exact.prevent="ProfileJump(8)"
+        @click="menuBool = false"
+        @keydown.up.exact="profileUp()"
+        @keydown.down.exact="profileDown()"
+        @keydown.tab.exact.prevent="profileDown()"
+        @keydown.shift.tab.exact.prevent="profileJumpToDefault()"
+        @keydown.ctrl.49.exact.prevent="profileJump(0)"
+        @keydown.ctrl.50.exact.prevent="profileJump(1)"
+        @keydown.ctrl.51.exact.prevent="profileJump(2)"
+        @keydown.ctrl.52.exact.prevent="profileJump(3)"
+        @keydown.ctrl.53.exact.prevent="profileJump(4)"
+        @keydown.ctrl.54.exact.prevent="profileJump(5)"
+        @keydown.ctrl.55.exact.prevent="profileJump(6)"
+        @keydown.ctrl.56.exact.prevent="profileJump(7)"
+        @keydown.ctrl.57.exact.prevent="profileJump(8)"
       >
         <v-row class="align-baseline">
           <v-text-field
-            v-model="InputString"
-            @keypress.enter="AddEntry()"
+            v-model="inputString"
+            @keypress.enter="addEntry()"
           />
-          <v-btn style="margin-left:10px" @click="AddEntry()">
+          <v-btn style="margin-left:10px" @click="addEntry()">
             Enter
           </v-btn>
         </v-row>
         <v-row class="align-stretch">
           <v-col cols="2">
             <v-text-field
-              v-model="Profile[ProfileIdx].Prefix"
+              v-model="profile[profileIdx].Prefix"
               label="Prefix"
               dense
               rounded
@@ -126,7 +126,7 @@
           </v-col>
           <v-col cols="2">
             <v-text-field
-              v-model="Profile[ProfileIdx].Suffix"
+              v-model="profile[profileIdx].Suffix"
               label="Suffix"
               dense
               rounded
@@ -134,7 +134,7 @@
             />
           </v-col>
           <v-checkbox
-            v-model="Profile[ProfileIdx].UseCC"
+            v-model="profile[profileIdx].useCC"
             class="shrink"
             label="Font Colour : "
             hide-details
@@ -142,27 +142,27 @@
           <v-btn
             class="ColourButton"
             small
-            :style="{ background: Profile[ProfileIdx].CC }"
-            @click.stop="ColourTemp = Profile[ProfileIdx].CC; ColourPick = 1; ColourDialogue = true;"
+            :style="{ background: profile[profileIdx].CC }"
+            @click.stop="colourTemp = profile[profileIdx].CC; colourPick = 1; colourDialogue = true;"
           >
-            {{ Profile[ProfileIdx].CC }}
+            {{ profile[profileIdx].CC }}
           </v-btn>
           <v-checkbox
-            v-model="Profile[ProfileIdx].UseOC"
+            v-model="profile[profileIdx].useOC"
             label="Outline Colour : "
             hide-details
           />
           <v-btn
             class="ColourButton"
             small
-            :style="{ background: Profile[ProfileIdx].OC }"
-            @click.stop="ColourTemp = Profile[ProfileIdx].OC; ColourPick = 2; ColourDialogue = true;"
+            :style="{ background: profile[profileIdx].OC }"
+            @click.stop="colourTemp = profile[profileIdx].OC; colourPick = 2; colourDialogue = true;"
           >
-            {{ Profile[ProfileIdx].OC }}
+            {{ profile[profileIdx].OC }}
           </v-btn>
           <v-col cols="2" style="margin-left:auto">
             <v-text-field
-              v-model="LocalPrefix"
+              v-model="localPrefix"
               label="Prefix"
               dense
               rounded
@@ -171,16 +171,16 @@
           </v-col>
         </v-row>
         <v-row>
-          <v-btn @click="ModalMode = 1; ModalNexus = true; AddProfileNameString = 'Profile ' + Profile.length;">
+          <v-btn @click="modalMode = 1; modalNexus = true; addProfileNameString = 'Profile ' + profile.length;">
             Add Profile
           </v-btn>
-          <v-btn @click="ModalMode = 2; ModalNexus = true">
+          <v-btn @click="modalMode = 2; modalNexus = true">
             Remove Profile
           </v-btn>
-          <v-btn @click="ShiftProfileUp()">
+          <v-btn @click="shiftProfileUp()">
             Shift Up
           </v-btn>
-          <v-btn @click="ShiftProfileDown()">
+          <v-btn @click="shiftProfileDown()">
             Shift Down
           </v-btn>
         </v-row>
@@ -189,22 +189,22 @@
 
     <!---------   COLOUR MODAL --------->
     <v-dialog
-      v-model="ColourDialogue"
+      v-model="colourDialogue"
       max-width="300px"
-      @click:outside.prevent="ColourPickerClose();"
+      @click:outside.prevent="colourPickerClose();"
     >
       <v-card>
-        <v-color-picker v-if="ColourPick === 1" v-model="Profile[ProfileIdx].CC" />
-        <v-color-picker v-else-if="ColourPick === 2" v-model="Profile[ProfileIdx].OC" />
-        <v-card-title :style="TextStyle" style="font-weight:bold;">
+        <v-color-picker v-if="colourPick === 1" v-model="profile[profileIdx].CC" />
+        <v-color-picker v-else-if="colourPick === 2" v-model="profile[profileIdx].OC" />
+        <v-card-title :style="textStyle" style="font-weight:bold;">
           The quick brown fox jumps over the lazy dog
         </v-card-title>
         <v-card-actions>
-          <v-btn @click="ColourPickerClose();">
+          <v-btn @click="colourPickerClose();">
             Cancel
           </v-btn>
 
-          <v-btn style="margin-left:auto" @click="ColourPickerOK()">
+          <v-btn style="margin-left:auto" @click="colourPickerOK()">
             Ok
           </v-btn>
         </v-card-actions>
@@ -220,19 +220,19 @@
       5 Unload Chat ALL
     -->
     <v-dialog
-      v-model="ModalNexus"
+      v-model="modalNexus"
       max-width="600px"
       persistent
-      @click:outside="ModalNexusOutsideClick();"
+      @click:outside="modalNexusOutsideClick();"
     >
       <!---------    ADD PROFILE     --------->
-      <v-card v-if="ModalMode === 1">
+      <v-card v-if="modalMode === 1">
         <v-container>
           <v-card-title>
             Add New Profile.
           </v-card-title>
           <v-text-field
-            v-model="AddProfileNameString"
+            v-model="addProfileNameString"
             label="Profile Name"
             placeholder="Profile Name"
             dense
@@ -240,11 +240,11 @@
             outlined
           />
           <v-card-actions>
-            <v-btn @click="ModalNexus = false">
+            <v-btn @click="modalNexus = false">
               Cancel
             </v-btn>
 
-            <v-btn style="margin-left:auto" @click="AddProfile()">
+            <v-btn style="margin-left:auto" @click="addProfile()">
               Ok
             </v-btn>
           </v-card-actions>
@@ -252,17 +252,17 @@
       </v-card>
 
       <!---------    Remove PROFILE     --------->
-      <v-card v-if="ModalMode === 2">
+      <v-card v-if="modalMode === 2">
         <v-container>
           <v-card-title>
-            Confirm remove profile {{ Profile[ProfileIdx].Name }}.
+            Confirm remove profile {{ profile[profileIdx].Name }}.
           </v-card-title>
           <v-card-actions>
-            <v-btn @click="ModalNexus = false">
+            <v-btn @click="modalNexus = false">
               Cancel
             </v-btn>
 
-            <v-btn style="margin-left:auto" @click="DeleteProfile()">
+            <v-btn style="margin-left:auto" @click="deleteProfile()">
               Ok
             </v-btn>
           </v-card-actions>
@@ -270,7 +270,7 @@
       </v-card>
 
       <!---------    SETTING     --------->
-      <v-card v-if="ModalMode === 3">
+      <v-card v-if="modalMode === 3">
         <v-container>
           <v-card-title>
             Setting
@@ -282,22 +282,22 @@
             item-value="value"
             label="TL Language"
             return-object
-            @change="LocalPrefix = '[' + TLLang.value + '] '"
+            @change="localPrefix = '[' + TLLang.value + '] '"
           />
-          <v-text-field v-model="MainStreamLink" label="Main Stream Link" />
+          <v-text-field v-model="mainStreamLink" label="Main Stream Link" />
           <v-card-title>Collab Links</v-card-title>
           <v-text-field
-            v-for="(AuxLink, index) in CollabLinks"
+            v-for="(AuxLink, index) in collabLinks"
             :key="index"
-            v-model="CollabLinks[index]"
+            v-model="collabLinks[index]"
             :append-outer-icon="mdiPlusCircle"
             :prepend-icon="mdiMinusCircle"
             style="margin-left: 17px"
-            @click:prepend="DeleteAuxLink(index)"
-            @click:append-outer="CollabLinks.push('');"
+            @click:prepend="deleteAuxLink(index)"
+            @click:append-outer="collabLinks.push('');"
           />
           <v-card-actions class="d-flex flex-row justify-center">
-            <v-btn @click="SettingOKClick()">
+            <v-btn @click="settingOKClick()">
               Ok
             </v-btn>
           </v-card-actions>
@@ -305,18 +305,18 @@
       </v-card>
 
       <!-------  LOAD ACTIVE CHAT ------->
-      <v-card v-if="ModalMode === 4">
+      <v-card v-if="modalMode === 4">
         <v-container>
           <v-card-title>
             Sync chat
           </v-card-title>
-          <v-text-field v-model="ActiveURLStream" label="Stream Link" />
+          <v-text-field v-model="activeURLStream" label="Stream Link" />
           <v-card-actions>
-            <v-btn @click="ModalNexus = false">
+            <v-btn @click="modalNexus = false">
               Cancel
             </v-btn>
 
-            <v-btn style="margin-left:auto" @click="LoadChat(ActiveURLStream); ModalNexus = false;">
+            <v-btn style="margin-left:auto" @click="loadChat(activeURLStream); modalNexus = false;">
               Ok
             </v-btn>
           </v-card-actions>
@@ -324,17 +324,17 @@
       </v-card>
 
       <!-------  UNLOAD ALL ACTIVE CHAT ------->
-      <v-card v-if="ModalMode === 5">
+      <v-card v-if="modalMode === 5">
         <v-container>
           <v-card-title>
             Unload ALL active chat?
           </v-card-title>
           <v-card-actions>
-            <v-btn @click="ModalNexus = false">
+            <v-btn @click="modalNexus = false">
               Cancel
             </v-btn>
 
-            <v-btn style="margin-left:auto" @click="UnloadAll(); ModalNexus = false;">
+            <v-btn style="margin-left:auto" @click="unloadAll(); modalNexus = false;">
               Ok
             </v-btn>
           </v-card-actions>
@@ -349,6 +349,7 @@
 import EnhancedEntry from "@/components/tlclient/EnhancedEntry.vue";
 import { TL_LANGS } from "@/utils/consts";
 import { mdiPlusCircle, mdiMinusCircle, mdiCloseCircle } from "@mdi/js";
+import { getVideoIDFromUrl } from "@/utils/functions";
 
 export default {
     name: "Tlclient",
@@ -368,60 +369,60 @@ export default {
             mdiPlusCircle,
             mdiMinusCircle,
             mdiCloseCircle,
-            MenuBool: false,
-            FirstLoad: true,
-            Entries: [],
-            Profile: [{
+            menuBool: false,
+            firstLoad: true,
+            entries: [],
+            profile: [{
                 Name: "Default",
                 Prefix: "",
                 Suffix: "",
-                UseCC: false,
+                useCC: false,
                 CC: "#000000",
-                UseOC: false,
+                useOC: false,
                 OC: "#000000",
             }],
-            ProfileContainer: {},
-            ProfileIdx: 0,
-            ProfileDisplay: false,
-            ProfileDisplayTimer: undefined,
-            InputString: "",
-            LocalPrefix: `[${TL_LANGS[0].value}] `,
+            profileContainer: {},
+            profileIdx: 0,
+            profileDisplay: false,
+            profileDisplayTimer: undefined,
+            inputString: "",
+            localPrefix: `[${TL_LANGS[0].value}] `,
             // ------ COLOUR -------
-            ColourPick: 0,
-            ColourDialogue: false,
-            ColourTemp: "",
+            colourPick: 0,
+            colourDialogue: false,
+            colourTemp: "",
             // ------ MODAL --------
-            ModalNexus: true,
-            ModalMode: 3,
-            AddProfileNameString: "",
+            modalNexus: true,
+            modalMode: 3,
+            addProfileNameString: "",
             // ------ SETTING ------
             TLLang: TL_LANGS[0],
-            MainStreamLink: "",
-            CollabLinks: [""],
+            mainStreamLink: "",
+            collabLinks: [""],
             // ---- ACTIVE CHAT ----
-            ActiveChat: [],
-            ActiveURLStream: "",
+            activeChat: [],
+            activeURLStream: "",
         };
     },
     computed: {
-        TextStyle() {
+        textStyle() {
             return {
-                "-webkit-text-fill-color": (this.Profile[this.ProfileIdx].CC === "") ? "unset" : this.Profile[this.ProfileIdx].CC,
-                "-webkit-text-stroke-color": (this.Profile[this.ProfileIdx].OC === "") ? "unset" : this.Profile[this.ProfileIdx].OC,
-                "-webkit-text-stroke-width": (this.Profile[this.ProfileIdx].OC === "") ? "0px" : "1px",
+                "-webkit-text-fill-color": (this.profile[this.profileIdx].CC === "") ? "unset" : this.profile[this.profileIdx].CC,
+                "-webkit-text-stroke-color": (this.profile[this.profileIdx].OC === "") ? "unset" : this.profile[this.profileIdx].OC,
+                "-webkit-text-stroke-width": (this.profile[this.profileIdx].OC === "") ? "0px" : "1px",
             };
         },
-        ActiveChatGridRow() {
+        activeChatGridRow() {
             return ({
-                "grid-template-rows": this.ActiveChat.length < 4 ? "1fr" : "1fr 1fr",
+                "grid-template-rows": this.activeChat.length < 4 ? "1fr" : "1fr 1fr",
             });
         },
     },
     methods: {
         IFrameLoaded(event, target: string) {
-            for (let i = 0; i < this.ActiveChat.length; i += 1) {
-                if (this.ActiveChat[i].text === target) {
-                    this.ActiveChat[i].IFrameEle = event.target;
+            for (let i = 0; i < this.activeChat.length; i += 1) {
+                if (this.activeChat[i].text === target) {
+                    this.activeChat[i].IFrameEle = event.target;
                     switch (target.slice(0, 3)) {
                         case "YT_":
                             event.target.contentWindow?.postMessage({
@@ -443,28 +444,28 @@ export default {
                 }
             }
         },
-        AddEntry() {
-            this.Entries.push({
+        addEntry() {
+            this.entries.push({
                 Time: Date.now(),
-                SText: this.Profile[this.ProfileIdx].Prefix + this.InputString + this.Profile[this.ProfileIdx].Suffix,
-                CC: this.Profile[this.ProfileIdx].UseCC ? this.Profile[this.ProfileIdx].CC : "",
-                OC: this.Profile[this.ProfileIdx].UseOC ? this.Profile[this.ProfileIdx].OC : "",
+                SText: this.profile[this.profileIdx].Prefix + this.inputString + this.profile[this.profileIdx].Suffix,
+                CC: this.profile[this.profileIdx].useCC ? this.profile[this.profileIdx].CC : "",
+                OC: this.profile[this.profileIdx].useOC ? this.profile[this.profileIdx].OC : "",
             });
 
             // SEND TO HOLODEX += 1
-            this.ActiveChat.forEach((e) => {
+            this.activeChat.forEach((e) => {
                 switch (e.text.slice(0, 3)) {
                     case "YT_":
                         e.IFrameEle?.contentWindow?.postMessage({
                             n: "HolodexSync",
-                            d: this.LocalPrefix + this.Profile[this.ProfileIdx].Prefix + this.InputString + this.Profile[this.ProfileIdx].Suffix,
+                            d: this.localPrefix + this.profile[this.profileIdx].Prefix + this.inputString + this.profile[this.profileIdx].Suffix,
                         }, "https://www.youtube.com");
                         break;
 
                     case "TW_":
                         e.IFrameEle?.contentWindow?.postMessage({
                             n: "HolodexSync",
-                            d: this.LocalPrefix + this.Profile[this.ProfileIdx].Prefix + this.InputString + this.Profile[this.ProfileIdx].Suffix,
+                            d: this.localPrefix + this.profile[this.profileIdx].Prefix + this.inputString + this.profile[this.profileIdx].Suffix,
                         }, "https://www.twitch.tv");
                         break;
 
@@ -474,122 +475,122 @@ export default {
             });
 
             // SEND TO API
-            this.InputString = "";
+            this.inputString = "";
         },
-        DeleteAuxLink(idx: number) {
-            if (this.CollabLinks.length !== 1) {
-                this.CollabLinks.splice(idx, 1);
+        deleteAuxLink(idx: number) {
+            if (this.collabLinks.length !== 1) {
+                this.collabLinks.splice(idx, 1);
             }
         },
-        ModalNexusOutsideClick() {
-            if (this.ModalMode !== 3) {
-                this.ModalNexus = false;
+        modalNexusOutsideClick() {
+            if (this.modalMode !== 3) {
+                this.modalNexus = false;
             }
         },
-        SettingOKClick() {
-            this.ModalNexus = false;
-            if (this.FirstLoad) {
-                this.LoadChat(this.MainStreamLink);
-                this.CollabLinks.forEach((e) => {
-                    this.LoadChat(e);
+        settingOKClick() {
+            this.modalNexus = false;
+            if (this.firstLoad) {
+                this.loadChat(this.mainStreamLink);
+                this.collabLinks.forEach((e) => {
+                    this.loadChat(e);
                 });
-                this.FirstLoad = false;
+                this.firstLoad = false;
             }
         },
         // ------------------------ PROFILE CONTROLLER ------------------------
-        ShiftProfileUp() {
-            if (this.ProfileIdx > 1) {
-                this.ProfileContainer = JSON.parse(JSON.stringify(this.Profile[this.ProfileIdx - 1]));
-                this.Profile[this.ProfileIdx - 1] = this.Profile[this.ProfileIdx];
-                this.Profile[this.ProfileIdx] = this.ProfileContainer;
-                this.ProfileIdx -= 1;
-                this.ProfileContainer = {};
+        shiftProfileUp() {
+            if (this.profileIdx > 1) {
+                this.profileContainer = JSON.parse(JSON.stringify(this.profile[this.profileIdx - 1]));
+                this.profile[this.profileIdx - 1] = this.profile[this.profileIdx];
+                this.profile[this.profileIdx] = this.profileContainer;
+                this.profileIdx -= 1;
+                this.profileContainer = {};
             }
-            this.ShowProfileList();
+            this.showProfileList();
         },
-        ShiftProfileDown() {
-            if ((this.ProfileIdx !== 0) && (this.ProfileIdx < this.Profile.length - 1)) {
-                this.ProfileContainer = JSON.parse(JSON.stringify(this.Profile[this.ProfileIdx + 1]));
-                this.Profile[this.ProfileIdx + 1] = this.Profile[this.ProfileIdx];
-                this.Profile[this.ProfileIdx] = this.ProfileContainer;
-                this.ProfileIdx += 1;
-                this.ProfileContainer = {};
+        shiftProfileDown() {
+            if ((this.profileIdx !== 0) && (this.profileIdx < this.profile.length - 1)) {
+                this.profileContainer = JSON.parse(JSON.stringify(this.profile[this.profileIdx + 1]));
+                this.profile[this.profileIdx + 1] = this.profile[this.profileIdx];
+                this.profile[this.profileIdx] = this.profileContainer;
+                this.profileIdx += 1;
+                this.profileContainer = {};
             }
-            this.ShowProfileList();
+            this.showProfileList();
         },
-        ProfileUp() {
-            if (this.ProfileIdx === 0) {
-                this.ProfileIdx = this.Profile.length - 1;
+        profileUp() {
+            if (this.profileIdx === 0) {
+                this.profileIdx = this.profile.length - 1;
             } else {
-                this.ProfileIdx -= 1;
+                this.profileIdx -= 1;
             }
-            this.ShowProfileList();
+            this.showProfileList();
         },
-        ProfileDown() {
-            if (this.ProfileIdx === this.Profile.length - 1) {
-                this.ProfileIdx = 0;
+        profileDown() {
+            if (this.profileIdx === this.profile.length - 1) {
+                this.profileIdx = 0;
             } else {
-                this.ProfileIdx += 1;
+                this.profileIdx += 1;
             }
-            this.ShowProfileList();
+            this.showProfileList();
         },
-        ProfileJump(idx: number) {
-            if (idx < this.Profile.length) {
-                this.ProfileIdx = idx;
+        profileJump(idx: number) {
+            if (idx < this.profile.length) {
+                this.profileIdx = idx;
             }
-            this.ShowProfileList();
+            this.showProfileList();
         },
-        ProfileJumpToDefault() {
-            this.ProfileIdx = 0;
-            this.ShowProfileList();
+        profileJumpToDefault() {
+            this.profileIdx = 0;
+            this.showProfileList();
         },
-        AddProfile() {
-            if (this.AddProfileNameString.trim() === "") {
-                this.AddProfileNameString = `Profile ${this.Profile.length}`;
+        addProfile() {
+            if (this.addProfileNameString.trim() === "") {
+                this.addProfileNameString = `Profile ${this.profile.length}`;
             }
-            this.Profile.push({
-                Name: this.AddProfileNameString,
+            this.profile.push({
+                Name: this.addProfileNameString,
                 Prefix: "",
                 Suffix: "",
-                UseCC: false,
+                useCC: false,
                 CC: "#000000",
-                UseOC: false,
+                useOC: false,
                 OC: "#000000",
             });
-            this.ProfileIdx = this.Profile.length - 1;
-            this.ModalNexus = false;
-            this.ShowProfileList();
+            this.profileIdx = this.profile.length - 1;
+            this.modalNexus = false;
+            this.showProfileList();
         },
-        DeleteProfile() {
-            if (this.ProfileIdx !== 0) {
-                this.ProfileIdx -= 1;
-                this.Profile.splice(this.ProfileIdx + 1, 1);
+        deleteProfile() {
+            if (this.profileIdx !== 0) {
+                this.profileIdx -= 1;
+                this.profile.splice(this.profileIdx + 1, 1);
             }
-            this.ModalNexus = false;
-            this.ShowProfileList();
+            this.modalNexus = false;
+            this.showProfileList();
         },
-        ShowProfileList() {
-            if (!this.ProfileDisplay) {
-                this.ProfileDisplay = true;
+        showProfileList() {
+            if (!this.profileDisplay) {
+                this.profileDisplay = true;
             }
 
-            if (this.ProfileDisplayTimer) {
-                clearInterval(this.ProfileDisplayTimer);
+            if (this.profileDisplayTimer) {
+                clearInterval(this.profileDisplayTimer);
             }
 
-            this.ProfileDisplayTimer = setInterval(() => {
-                this.ProfileDisplay = false;
-                clearInterval(this.ProfileDisplayTimer);
+            this.profileDisplayTimer = setInterval(() => {
+                this.profileDisplay = false;
+                clearInterval(this.profileDisplayTimer);
             }, 3000);
         },
         //= ======================== PROFILE CONTROLLER ========================
 
         // ---------------------- ACTIVE CHAT CONTROLLER ----------------------
-        UnloadAll() {
-            this.ActiveChat = [];
+        unloadAll() {
+            this.activeChat = [];
         },
-        CloseActiveChat(idx: number) {
-            this.ActiveChat.splice(idx, 1);
+        closeActiveChat(idx: number) {
+            this.activeChat.splice(idx, 1);
         },
         URLExtender(s: string) {
             switch (s.slice(0, 3)) {
@@ -603,83 +604,39 @@ export default {
                     return "";
             }
         },
-        LoadChat(s: string) {
-            let StreamURL = s;
-            if (StreamURL.indexOf("https://www.youtube.com/watch?v=") === 0) {
-                StreamURL = StreamURL.replace("https://www.youtube.com/watch?v=", "");
-                if (StreamURL.indexOf("&") !== -1) {
-                    StreamURL = StreamURL.slice(0, StreamURL.indexOf("&"));
-                }
-                StreamURL = `YT_${StreamURL}`;
-                if (this.ActiveChat.filter((e) => e.text === StreamURL).length === 0) {
-                    this.ActiveChat.push({
-                        text: StreamURL,
-                        IFrameEle: undefined,
-                    });
-                }
-            } else if (StreamURL.indexOf("https://youtu.be/") === 0) {
-                StreamURL = StreamURL.replace("https://youtu.be/", "");
-                if (StreamURL.indexOf("?") !== -1) {
-                    StreamURL = StreamURL.slice(0, StreamURL.indexOf("?"));
-                }
-                StreamURL = `YT_${StreamURL}`;
-                if (this.ActiveChat.filter((e) => e.text === StreamURL).length === 0) {
-                    this.ActiveChat.push({
-                        text: StreamURL,
-                        IFrameEle: undefined,
-                    });
-                }
-            } else if (StreamURL.indexOf("https://www.youtube.com/live_chat?is_popout=1&v=") === 0) {
-                StreamURL = StreamURL.replace("https://www.youtube.com/live_chat?is_popout=1&v=", "");
-                if (StreamURL.indexOf("&") !== -1) {
-                    StreamURL = StreamURL.slice(0, StreamURL.indexOf("&"));
-                }
-                StreamURL = `YT_${StreamURL}`;
-                if (this.ActiveChat.filter((e) => e.text === StreamURL).length === 0) {
-                    this.ActiveChat.push({
-                        text: StreamURL,
-                        IFrameEle: undefined,
-                    });
-                }
-            } else if (StreamURL.indexOf("https://www.twitch.tv/popout/") === 0) {
-                StreamURL = StreamURL.replace("https://www.twitch.tv/popout/", "");
-                if (StreamURL.indexOf("/") !== -1) {
-                    StreamURL = StreamURL.slice(0, StreamURL.indexOf("/"));
-                }
-                StreamURL = `TW_${StreamURL}`;
-                if (this.ActiveChat.filter((e) => e.text === StreamURL).length === 0) {
-                    this.ActiveChat.push({
-                        text: StreamURL,
-                        IFrameEle: undefined,
-                    });
-                }
-            } else if (StreamURL.indexOf("https://www.twitch.tv/") === 0) {
-                StreamURL = StreamURL.replace("https://www.twitch.tv/", "");
-                if (StreamURL.indexOf("/") === -1) {
-                    if (StreamURL.indexOf("?") !== -1) {
-                        StreamURL = StreamURL.slice(0, StreamURL.indexOf("?"));
-                    }
-                    StreamURL = `TW_${StreamURL}`;
-                    if (this.ActiveChat.filter((e) => e.text === StreamURL).length === 0) {
-                        this.ActiveChat.push({
-                            text: StreamURL,
+        loadChat(s: string) {
+            const StreamURL = getVideoIDFromUrl(s);
+            if (StreamURL) {
+                switch (StreamURL.type) {
+                    case "twitch": {
+                        this.activeChat.push({
+                            text: `TW_${StreamURL.id}`,
                             IFrameEle: undefined,
                         });
+                        break;
+                    }
+
+                    default: {
+                        this.activeChat.push({
+                            text: `YT_${StreamURL.id}`,
+                            IFrameEle: undefined,
+                        });
+                        break;
                     }
                 }
             }
         },
         //= ====================== ACTIVE CHAT CONTROLLER ======================
-        ColourPickerClose() {
-            if (this.ColourPick === 1) {
-                this.Profile[this.ProfileIdx].CC = this.ColourTemp;
-            } else if (this.ColourPick === 2) {
-                this.Profile[this.ProfileIdx].OC = this.ColourTemp;
+        colourPickerClose() {
+            if (this.colourPick === 1) {
+                this.profile[this.profileIdx].CC = this.colourTemp;
+            } else if (this.colourPick === 2) {
+                this.profile[this.profileIdx].OC = this.colourTemp;
             }
-            this.ColourDialogue = false;
+            this.colourDialogue = false;
         },
-        ColourPickerOK() {
-            this.ColourDialogue = false;
+        colourPickerOK() {
+            this.colourDialogue = false;
         },
     },
 };
@@ -714,7 +671,7 @@ export default {
   display: grid;
   grid-auto-flow: column;
 }
-.ActiveChatIFrame{
+.activeChatIFrame{
   width: 100%;
   height: 100%;
 }

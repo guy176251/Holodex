@@ -314,5 +314,15 @@ export default {
                 headers: jwt ? { Authorization: `BEARER ${jwt}` } : {},
             });
     },
+    // TL RELATED STUFF
+    checkTLStatus(queryObject) {
+        return axiosInstance.post("/tl/status", queryObject);
+    },
+    applyTL(queryObject) {
+        return axiosInstance.post("/tl/apply", queryObject);
+    },
+    postTL(queryObject) {
+        return axiosInstance.post("/tl/entry", queryObject);
+    },
 
 };

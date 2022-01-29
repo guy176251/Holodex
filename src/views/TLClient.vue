@@ -218,6 +218,7 @@
       3 Setting
       4 Load Chat
       5 Unload Chat ALL
+      6 Login Check
     -->
     <v-dialog
       v-model="modalNexus"
@@ -340,6 +341,41 @@
           </v-card-actions>
         </v-container>
       </v-card>
+
+      <!-------  LOGGIN IN CHECK CHAT ------->
+      <v-card v-if="modalMode === 6">
+        <v-container>
+          <v-card-title>
+            {{ loginStatusText }}
+          </v-card-title>
+
+          <v-card v-if="(loginStatus === 2) || (loginStatus === 3) || (loginStatus === 4)">
+            <v-divider />
+            <v-card-subtitle>
+              {{ (loginNoteText === '') ? '' : 'Message from reviewer : ' + loginNoteText }}
+            </v-card-subtitle>
+            <v-text-field v-if="loginStatus != 4" v-model="applicationText" label="Note" />
+            <v-divider />
+          </v-card>
+
+          <v-card-actions>
+            <v-btn href="/">
+              Back
+            </v-btn>
+            <v-btn v-if="loginStatus===-1" style="margin-left:auto" href="/login">
+              Login
+            </v-btn>
+
+            <v-btn v-if="loginStatus===2" style="margin-left:auto" @click="applyTL();">
+              Apply
+            </v-btn>
+
+            <v-btn v-if="loginStatus===3" style="margin-left:auto" @click="applyTL();">
+              Re-apply
+            </v-btn>
+          </v-card-actions>
+        </v-container>
+      </v-card>
     </v-dialog>
     <!--========   NEXUS MODAL =======-->
   </v-container>
@@ -350,6 +386,7 @@ import EnhancedEntry from "@/components/tlclient/EnhancedEntry.vue";
 import { TL_LANGS } from "@/utils/consts";
 import { mdiPlusCircle, mdiMinusCircle, mdiCloseCircle } from "@mdi/js";
 import { getVideoIDFromUrl } from "@/utils/functions";
+import backendApi from "@/utils/backend-api";
 
 export default {
     name: "Tlclient",
@@ -393,7 +430,7 @@ export default {
             colourTemp: "",
             // ------ MODAL --------
             modalNexus: true,
-            modalMode: 3,
+            modalMode: 6,
             addProfileNameString: "",
             // ------ SETTING ------
             TLLang: TL_LANGS[0],
@@ -402,6 +439,12 @@ export default {
             // ---- ACTIVE CHAT ----
             activeChat: [],
             activeURLStream: "",
+            // ---- PRIVILIGE CHECK ----
+            loginStatusText: "Checking login status...",
+            loginStatus: 0, // 0: check login status, 1: check TL privilege, 2: not applied, 3: application rejected, 4: banned
+            loginNoteText: "",
+            applicationText: "",
+            loggedInTL: false,
         };
     },
     computed: {
@@ -417,6 +460,15 @@ export default {
                 "grid-template-rows": this.activeChat.length < 4 ? "1fr" : "1fr 1fr",
             });
         },
+        userdata() {
+            return this.$store.state.userdata;
+        },
+        user() {
+            return this.$store.state.userdata.user;
+        },
+    },
+    mounted() {
+        this.checkLoginValidity();
     },
     methods: {
         IFrameLoaded(event, target: string) {
@@ -475,6 +527,31 @@ export default {
             });
 
             // SEND TO API
+            backendApi.postTL({
+                time: Date.now(),
+                text: this.profile[this.profileIdx].Prefix + this.inputString + this.profile[this.profileIdx].Suffix,
+                cc: this.profile[this.profileIdx].useCC ? this.profile[this.profileIdx].CC : "",
+                oc: this.profile[this.profileIdx].useOC ? this.profile[this.profileIdx].OC : "",
+            }).then(({ status, data }) => {
+                if (status === 200) {
+                    console.log("SENT!");
+                } else {
+                    this.entries.push({
+                        Time: Date.now(),
+                        SText: `ERR : ${data}`,
+                        CC: "",
+                        OC: "",
+                    });
+                }
+            }).catch(() => {
+                this.entries.push({
+                    Time: Date.now(),
+                    SText: "FAILED SENDING TO DATABASE",
+                    CC: "",
+                    OC: "",
+                });
+            });
+
             this.inputString = "";
         },
         deleteAuxLink(idx: number) {
@@ -483,7 +560,7 @@ export default {
             }
         },
         modalNexusOutsideClick() {
-            if (this.modalMode !== 3) {
+            if ((this.modalMode !== 3) && this.loggedInTL) {
                 this.modalNexus = false;
             }
         },
@@ -638,6 +715,88 @@ export default {
         colourPickerOK() {
             this.colourDialogue = false;
         },
+        // ------------------------ LOGIN STATUS CHECK ------------------------
+        async checkLoginValidity() {
+            const check = await backendApi.loginIsValid(this.userdata.jwt);
+            if (check === false) {
+                this.$store.dispatch("logout");
+                this.loginStatus = -1;
+                this.loginStatusText = "User not logged in.";
+            } else if (check.data && check.data.id) {
+                this.$store.commit("setUser", { user: check.data, jwt: this.userdata.jwt });
+                this.loginStatus = 1;
+                this.loginStatusText = "Logged in, checking TL privilege...";
+                this.checkUserTLStatus();
+            }
+        },
+        async checkUserTLStatus() {
+            backendApi.checkTLStatus({
+                id: this.user.id,
+            }).then(({ status, data }) => {
+                if (status === 200) {
+                    switch (data.status) {
+                        case "OK":
+                            this.loginStatusText = "OK!";
+                            this.modalMode = 3;
+                            return;
+
+                        case "BANNED":
+                            this.loginStatusText = "Banned.";
+                            this.loginNoteText = data.note;
+                            this.loginStatus = 4;
+                            return;
+
+                        case "REJECTED":
+                            this.loginStatusText = "Application rejected.";
+                            this.loginNoteText = data.note;
+                            this.applicationText = "Add note here to help review your application, it can be your qualification or link to past stream that you've translated.";
+                            this.loginStatus = 3;
+                            return;
+
+                        case "APPLIED":
+                            this.loginStatusText = "Application has been sent, still waiting for review.";
+                            this.loginStatus = -2;
+                            return;
+
+                        case "NOT":
+                            this.loginStatusText = "Not applied for TL role.";
+                            this.applicationText = "Add note here to help review your application, it can be your qualification or link to past stream that you've translated.";
+                            this.loginStatus = 2;
+                            return;
+
+                        default:
+                            this.loginStatus = -2;
+                            this.loginStatusText = "Can't reach server";
+                    }
+                } else {
+                    this.loginStatus = -2;
+                    this.loginStatusText = "Can't reach server";
+                }
+            }).catch((err) => {
+                this.loginStatus = -2;
+                this.loginStatusText = "Can't reach server";
+                console.log(err);
+            });
+        },
+        applyTL() {
+            backendApi.applyTL({
+                id: this.user.id,
+                note: this.applicationText,
+            }).then(({ status }) => {
+                if (status === 200) {
+                    this.loginStatusText = "Application sent! Please be patient while we check your application...";
+                    this.loginStatus = -2;
+                } else {
+                    this.loginStatus = -2;
+                    this.loginStatusText = "Can't reach server";
+                }
+            }).catch((err) => {
+                this.loginStatus = -2;
+                this.loginStatusText = "Can't reach server";
+                console.log(err);
+            });
+        },
+        //= ======================= LOGIN STATUS CHECK ========================
     },
 };
 </script>

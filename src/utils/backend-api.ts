@@ -324,5 +324,8 @@ export default {
     postTL(queryObject) {
         return axiosInstance.post("/tl/entry", queryObject);
     },
+    getTLApplications(queryObject) {
+        return axiosInstance.post("/tl/list", queryObject);
+    },
 
 };

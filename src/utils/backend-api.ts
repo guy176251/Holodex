@@ -327,5 +327,8 @@ export default {
     getTLApplications(queryObject) {
         return axiosInstance.post("/tl/list", queryObject);
     },
+    changeTLStatus(queryObject) {
+        return axiosInstance.post("/tl/change", queryObject);
+    },
 
 };

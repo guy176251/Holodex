@@ -781,7 +781,7 @@ export default {
         applyTL() {
             backendApi.applyTL({
                 id: this.user.id,
-                note: this.applicationText,
+                applynote: this.applicationText,
             }).then(({ status }) => {
                 if (status === 200) {
                     this.loginStatusText = "Application sent! Please be patient while we check your application...";

@@ -16,7 +16,7 @@
           elevation="4"
           color="secondary"
           style="margin-left:5px"
-          @click="vidPlayer = false;"
+          @click="unloadVideo()"
         >
           Unload Video
         </v-btn>
@@ -47,11 +47,25 @@
           <v-card v-if="profileDisplay" class="ProfileListCard d-flex flex-column">
             <span v-for="(prf, index) in profile" :key="index"><span v-if="index === profileIdx">> </span>{{ (index + 1) + '. ' + prf.Name }}</span>
           </v-card>
+          <v-card-actions v-if="!vidPlayer" class="ControlBox d-flex flex-row">
+            <v-btn small @click="timerTimeStop();">
+              <v-icon dark>
+                {{ mdiStop }}
+              </v-icon>
+            </v-btn>
+            <span>{{ timerPrint }}</span>
+            <v-btn small @click="timerTimeStart();">
+              <v-icon dark>
+                {{ mdiPlay }}
+              </v-icon>
+            </v-btn>
+          </v-card-actions>
         </v-card>
         <v-card
           v-if="vidPlayer"
           height="100%"
           width="50%"
+          class="d-flex flex-column"
           outlined
         >
           <v-card
@@ -59,6 +73,19 @@
             height="100%"
             width="100%"
           />
+          <v-card-actions class="d-flex flex-row justify-center">
+            <v-btn small @click="timerTimeStop();">
+              <v-icon dark>
+                {{ mdiStop }}
+              </v-icon>
+            </v-btn>
+            <span>{{ timerPrint }}</span>
+            <v-btn small @click="timerTimeStart();">
+              <v-icon dark>
+                {{ mdiPlay }}
+              </v-icon>
+            </v-btn>
+          </v-card-actions>
         </v-card>
       </div>
 
@@ -77,6 +104,9 @@
         @keydown.ctrl.55.exact.prevent="profileJump(6)"
         @keydown.ctrl.56.exact.prevent="profileJump(7)"
         @keydown.ctrl.57.exact.prevent="profileJump(8)"
+        @keydown.ctrl.space="ctrlSpace()"
+        @keydown.ctrl.left="ctrlLeft()"
+        @keydown.ctrl.right="ctrlRight()"
       >
         <v-row class="align-baseline">
           <v-text-field
@@ -244,7 +274,7 @@
               Cancel
             </v-btn>
 
-            <v-btn style="margin-left:auto" @click="loadChat(); modalNexus = false;">
+            <v-btn style="margin-left:auto" @click="loadVideo(); modalNexus = false;">
               Ok
             </v-btn>
           </v-card-actions>
@@ -293,7 +323,7 @@
 <script lang="ts">
 import EnhancedEntry from "@/components/tlscripteditor/EnhancedEntry.vue";
 import { TL_LANGS } from "@/utils/consts";
-import { mdiPlusCircle, mdiMinusCircle, mdiCloseCircle } from "@mdi/js";
+import { mdiPlay, mdiStop } from "@mdi/js";
 import { getVideoIDFromUrl } from "@/utils/functions";
 import backendApi from "@/utils/backend-api";
 
@@ -317,9 +347,8 @@ export default {
     data() {
         return {
             TL_LANGS,
-            mdiPlusCircle,
-            mdiMinusCircle,
-            mdiCloseCircle,
+            mdiPlay,
+            mdiStop,
             menuBool: false,
             entries: [],
             profile: [{
@@ -351,6 +380,7 @@ export default {
             // ---- ACTIVE VIDEO ----
             activeURLInput: "",
             activeURLStream: "",
+            vidType: "",
             vidPlayer: false,
             vidIframeEle: null,
             player: null,
@@ -361,6 +391,10 @@ export default {
             loginNoteText: "",
             applicationText: "",
             loggedInTL: true,
+            // ---- TIMER CONTROLLER ----
+            timerTime: 0,
+            timerDelegate: undefined,
+            timeSaddle: Date.now(),
         };
     },
     computed: {
@@ -376,6 +410,47 @@ export default {
         },
         user() {
             return this.$store.state.userdata.user;
+        },
+        timerPrint() {
+            let timeRaw = this.timerTime;
+            let timeString = "";
+
+            let t = Math.floor(timeRaw / 60 / 60 / 1000);
+            timeRaw -= t * 60 * 60 * 1000;
+            if (t < 10) {
+                timeString += `0${t.toString()}`;
+            } else {
+                timeString += t.toString();
+            }
+            timeString += ":";
+
+            t = Math.floor(timeRaw / 60 / 1000);
+            timeRaw -= t * 60 * 1000;
+            if (t < 10) {
+                timeString += `0${t.toString()}`;
+            } else {
+                timeString += t.toString();
+            }
+            timeString += ":";
+
+            t = Math.floor(timeRaw / 1000);
+            timeRaw -= t * 1000;
+            if (t < 10) {
+                timeString += `0${t.toString()}`;
+            } else {
+                timeString += t.toString();
+            }
+            timeString += ".";
+
+            if (timeRaw > 100) {
+                timeString += timeRaw.toString().slice(0, 2);
+            } else if (timeRaw > 10) {
+                timeString += `0${timeRaw.toString().slice(0, 1)}`;
+            } else {
+                timeString += "00";
+            }
+
+            return timeString;
         },
     },
     mounted() {
@@ -402,6 +477,203 @@ export default {
                 this.modalNexus = false;
             }
         },
+        // ----------------------- TIMER CONTROLLER -----------------------
+        timerTimeStart() {
+            if (this.vidPlayer) {
+                switch (this.vidType) {
+                    case "twitch":
+                        this.player.play();
+                        break;
+
+                    case "twitch_vod":
+                        this.player.play();
+                        break;
+
+                    case "twitcast":
+
+                        break;
+
+                    case "twitcast_vod":
+
+                        break;
+
+                    case "niconico":
+                        break;
+
+                    case "niconico_vod":
+
+                        break;
+
+                    case "bilibili":
+                        break;
+
+                    case "bilibili_vod":
+
+                        break;
+
+                    default:
+                        this.player.playVideo();
+                        break;
+                }
+            } else if (!this.timerDelegate) {
+                this.timeSaddle = Date.now();
+                this.timerDelegate = setInterval(() => {
+                    if (Date.now() - this.timeSaddle < 1000) {
+                        this.timerTime += Date.now() - this.timeSaddle;
+                    }
+                    this.timeSaddle = Date.now();
+                // this.ScrollCalculator();
+                }, 20);
+            }
+        },
+        timerTimeStop() {
+            if (this.vidPlayer) {
+                switch (this.vidType) {
+                    case "twitch":
+                        this.player.pause();
+                        break;
+
+                    case "twitch_vod":
+                        this.player.pause();
+                        break;
+
+                    case "twitcast":
+
+                        break;
+
+                    case "twitcast_vod":
+
+                        break;
+
+                    case "niconico":
+                        break;
+
+                    case "niconico_vod":
+
+                        break;
+
+                    case "bilibili":
+                        break;
+
+                    case "bilibili_vod":
+
+                        break;
+
+                    default:
+                        this.player.pauseVideo();
+                        break;
+                }
+            } else if (this.timerDelegate) {
+                clearInterval(this.timerDelegate);
+                this.timerDelegate = undefined;
+            }
+        },
+        seekVideo(time:number) {
+            if (this.vidPlayer) {
+                switch (this.vidType) {
+                    case "twitch":
+                        this.player.seek(this.TimerTime / 1000 + time / 1000);
+                        break;
+
+                    case "twitch_vod":
+                        this.player.seek(this.TimerTime / 1000 + time / 1000);
+                        break;
+
+                    case "twitcast":
+
+                        break;
+
+                    case "twitcast_vod":
+
+                        break;
+
+                    case "niconico":
+                        break;
+
+                    case "niconico_vod":
+
+                        break;
+
+                    case "bilibili":
+                        break;
+
+                    case "bilibili_vod":
+
+                        break;
+
+                    default:
+                        this.player.seekTo(this.player.getCurrentTime() + time / 1000, true);
+                        break;
+                }
+            } else if (this.timerTime + time < 0) {
+                this.timerTime = 0;
+            } else {
+                this.timerTime += time;
+            }
+        },
+        ctrlRight() {
+            this.seekVideo(3000);
+        },
+        ctrlLeft() {
+            this.seekVideo(-3000);
+        },
+        ctrlSpace() {
+            if (this.vidPlayer) {
+                switch (this.vidType) {
+                    case "twitch":
+                        if (this.player.isPaused()) {
+                            this.timerTimeStart();
+                        } else {
+                            this.timerTimeStop();
+                        }
+                        break;
+
+                    case "twitch_vod":
+                        if (this.player.isPaused()) {
+                            this.timerTimeStart();
+                        } else {
+                            this.timerTimeStop();
+                        }
+                        break;
+
+                    case "twitcast":
+
+                        break;
+
+                    case "twitcast_vod":
+
+                        break;
+
+                    case "niconico":
+                        break;
+
+                    case "niconico_vod":
+
+                        break;
+
+                    case "bilibili":
+                        break;
+
+                    case "bilibili_vod":
+
+                        break;
+
+                    default:
+                        if (this.player.getPlayerState() !== 1) {
+                            this.timerTimeStart();
+                        } else if (this.player.getPlayerState() === 1) {
+                            this.timerTimeStop();
+                        }
+                        break;
+                }
+            } else if (this.timerDelegate) {
+                this.timerTimeStop();
+            } else {
+                this.timerTimeStart();
+            }
+        },
+        //= ====================== TIMER CONTROLLER =======================
+
         // ------------------------ PROFILE CONTROLLER ------------------------
         shiftProfileUp() {
             if (this.profileIdx > 1) {
@@ -502,47 +774,62 @@ export default {
         //= ======================== PROFILE CONTROLLER ========================
 
         // ---------------------- VIDEO CONTROLLER ----------------------
-        loadChat() {
+        loadVideo() {
             this.activeURLStream = this.activeURLInput;
             this.vidPlayer = true;
-            const StreamURL = getVideoIDFromUrl(this.activeURLStream);
-            switch (StreamURL.type) {
-                case "twitch":
-                    this.LoadvideoTW(StreamURL.id, true);
-                    break;
+            const checker = setInterval(() => {
+                const PlayerDiv = document.getElementById("player");
+                if (PlayerDiv) {
+                    clearInterval(checker);
+                    if (this.timerDelegate) {
+                        clearInterval(this.timerDelegate);
+                        this.timerDelegate = undefined;
+                    }
+                    const StreamURL = getVideoIDFromUrl(this.activeURLStream);
+                    if (StreamURL) {
+                        this.vidType = StreamURL.type;
+                        switch (StreamURL.type) {
+                            case "twitch":
+                                this.LoadvideoTW(StreamURL.id, true);
+                                break;
 
-                case "twitch_vod":
-                    this.LoadvideoTW(StreamURL.id, false);
-                    break;
+                            case "twitch_vod":
+                                this.LoadvideoTW(StreamURL.id, false);
+                                break;
 
-                case "twitcast":
-                    this.SetupIframeTC(StreamURL.id, StreamURL.id, true);
-                    break;
+                            case "twitcast":
+                                this.SetupIframeTC(StreamURL.id, StreamURL.id, true);
+                                break;
 
-                case "twitcast_vod":
-                    this.SetupIframeTC(StreamURL.id, StreamURL.channel.name, false);
-                    break;
+                            case "twitcast_vod":
+                                this.SetupIframeTC(StreamURL.id, StreamURL.channel.name, false);
+                                break;
 
-                case "niconico":
-                    // niconico doesn't allow third party player hosting... at least for now...
-                    // this.SetupIframeNC(StreamURL.id, true);
-                    break;
+                            case "niconico":
+                                // niconico doesn't allow third party player hosting... at least for now...
+                                // this.SetupIframeNC(StreamURL.id, true);
+                                break;
 
-                case "niconico_vod":
-                    this.SetupIframeNC(StreamURL.id, false);
-                    break;
+                            case "niconico_vod":
+                                this.SetupIframeNC(StreamURL.id, false);
+                                break;
 
-                case "bilibili":
-                    break;
+                            case "bilibili":
+                                // bilibili live player is flash -> the one in FLASH link in the share button
+                                // https://s1.hdslb.com/bfs/static/blive/live-assets/player/flash/pageplayer-latest.swf?room_id=0&cid=xxxxxx&state=LIVE
+                                break;
 
-                case "bilibili_vod":
-                    this.SetupIframeBL(StreamURL.id);
-                    break;
+                            case "bilibili_vod":
+                                this.SetupIframeBL(StreamURL.id);
+                                break;
 
-                default:
-                    this.LoadvideoYT(StreamURL.id);
-                    break;
-            }
+                            default:
+                                this.LoadvideoYT(StreamURL.id);
+                                break;
+                        }
+                    }
+                }
+            }, 1000);
         },
         SetupIframeTC(MID: string, UID: string, Live: boolean): void {
             if (this.vidIframeEle) {
@@ -707,6 +994,13 @@ export default {
                 }
             }
         },
+        unloadVideo() {
+            this.vidPlayer = false;
+            if (this.timerDelegate) {
+                clearInterval(this.timerDelegate);
+                this.timerDelegate = undefined;
+            }
+        },
         //= ================  IFRAME  =================
 
         // -----------------  YT  -----------------
@@ -733,46 +1027,21 @@ export default {
                 },
                 events: {
                     onReady: this.ReadyStateYT.bind(this),
-                    onStateChange: this.onPlayerStateChangeYT.bind(this),
                 },
             });
         },
-        onPlayerStateChangeYT() {
-            // this.TogglePlayPauseYT();
-        },
         ReadyStateYT() {
-            // this.PauseTracker = false;
-        },
-        TogglePlayPauseYT() {
-            /*
-          switch (this.player.getPlayerState()) {
-            case 1:
-              break;
-
-            case 2:
-              this.StopTimer(false);
-              break;
-
-            case 3:
-              break;
-          }
-          */
+            this.StartTrackerYT();
         },
         StartTrackerYT(): void {
-            /*
-          this.PauseTracker = true;
-          if (this.TrackerDelegate) {
-            clearInterval(this.TrackerDelegate);
-            this.TrackerDelegate = undefined;
-          }
-
-            this.TrackerDelegate = setInterval(() => {
-            if (!this.PauseTracker) {
-              this.TimerTime = this.player.getCurrentTime()*1000;
+            if (this.timerDelegate) {
+                clearInterval(this.timerDelegate);
+                this.timerDelegate = undefined;
             }
-            this.ScrollCalculator();
-          }, 20);
-          */
+            this.timerDelegate = setInterval(() => {
+                this.timerTime = this.player.getCurrentTime() * 1000;
+            // this.ScrollCalculator();
+            }, 20);
         },
         //= ================  YT  =================
 
@@ -825,10 +1094,8 @@ export default {
             });
 
             this.player.addEventListener(window.Twitch.Player.SEEK, (e: any) => {
-                this.TimerTime = e.position * 1000;
-            /*
-            this.ScrollCalculator();
-            */
+                this.timerTime = e.position * 1000;
+                // this.ScrollCalculator();
             });
         },
         StartTrackerTW(): void {
@@ -967,5 +1234,10 @@ export default {
 .ChatPanelContainer{
   display: grid;
   grid-auto-flow: column;
+}
+.ControlBox{
+  position: absolute;
+  top: 5px;
+  right: 5px;
 }
 </style>

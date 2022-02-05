@@ -23,8 +23,10 @@ const MultiView = () => import("../views/MultiView.vue");
 const Playlists = () => import("../views/Playlists.vue");
 const AddPlaceholderStream = () => import("../views/AddPlaceholderStream.vue");
 const Extension = () => import("../views/Extension.vue");
+
 const TLClient = () => import("../views/TLClient.vue");
 const TLManager = () => import("../views/TLManager.vue");
+const TLScriptEditor = () => import("../views/TLScriptEditor.vue");
 
 Vue.use(VueRouter);
 
@@ -167,6 +169,11 @@ const routes = [
         name: "tlmanager",
         path: "/tlmanager",
         component: TLManager,
+    },
+    {
+        name: "tlmscripteditor",
+        path: "/tlscripteditor",
+        component: TLScriptEditor,
     },
     {
         path: "/404",

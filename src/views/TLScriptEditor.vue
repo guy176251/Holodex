@@ -8,28 +8,17 @@
         <v-btn
           elevation="4"
           color="secondary"
-          @click="modalMode = 3; modalNexus = true"
+          @click="modalMode = 3; modalNexus = true; activeURLInput = activeURLStream;"
         >
-          Setting
-        </v-btn>
-        <v-divider
-          vertical
-          style="margin-left: 5px; margin-right:5px"
-        />
-        <v-btn
-          elevation="4"
-          color="secondary"
-          @click="modalMode = 4; modalNexus = true; activeURLStream = '';"
-        >
-          Sync Chat
+          Load Video
         </v-btn>
         <v-btn
           elevation="4"
           color="secondary"
           style="margin-left:5px"
-          @click="modalMode = 5; modalNexus = true"
+          @click="vidPlayer = false;"
         >
-          UnSync Chat
+          Unload Video
         </v-btn>
       </v-container>
     </v-card>
@@ -60,32 +49,16 @@
           </v-card>
         </v-card>
         <v-card
-          v-if="activeChat.length > 0"
-          class="ChatPanelContainer"
+          v-if="vidPlayer"
           height="100%"
-          :width="activeChat.length < 2 ? '50%' : '70%'"
-          :style="activeChatGridRow"
+          width="50%"
           outlined
         >
           <v-card
-            v-for="(ChatURL, index) in activeChat"
-            :key="ChatURL.text"
-            class="d-flex flex-column"
-            outlined
-          >
-            <p class="text-center" style="margin-top: 5px">
-              {{ ChatURL.text }}
-              <v-icon class="float-right" @click="closeActiveChat(index)">
-                {{ mdiCloseCircle }}
-              </v-icon>
-            </p>
-            <iframe
-              class="activeChatIFrame"
-              :src="URLExtender(ChatURL.text)"
-              frameborder="0"
-              @load="IFrameLoaded($event, ChatURL.text)"
-            />
-          </v-card>
+            id="player"
+            height="100%"
+            width="100%"
+          />
         </v-card>
       </div>
 
@@ -160,15 +133,6 @@
           >
             {{ profile[profileIdx].OC }}
           </v-btn>
-          <v-col cols="2" style="margin-left:auto">
-            <v-text-field
-              v-model="localPrefix"
-              label="Prefix"
-              dense
-              rounded
-              outlined
-            />
-          </v-col>
         </v-row>
         <v-row>
           <v-btn @click="modalMode = 1; modalNexus = true; addProfileNameString = 'Profile ' + profile.length;">
@@ -215,9 +179,7 @@
     <!---------   NEXUS MODAL ---------
       1 Add profile
       2 Remove Profile
-      3 Setting
-      4 Load Chat
-      5 Unload Chat ALL
+      3 Load Stream
       6 Login Check
     -->
     <v-dialog
@@ -270,79 +232,26 @@
         </v-container>
       </v-card>
 
-      <!---------    SETTING     --------->
+      <!-------  LOAD VIDEO  ------->
       <v-card v-if="modalMode === 3">
         <v-container>
           <v-card-title>
-            Setting
+            Load Video
           </v-card-title>
-          <v-select
-            v-model="TLLang"
-            :items="TL_LANGS"
-            :item-text="item => item.text + ' (' + item.value + ')'"
-            item-value="value"
-            label="TL Language"
-            return-object
-            @change="localPrefix = '[' + TLLang.value + '] '"
-          />
-          <v-text-field v-model="mainStreamLink" label="Main Stream Link" />
-          <v-card-title>Collab Links</v-card-title>
-          <v-text-field
-            v-for="(AuxLink, index) in collabLinks"
-            :key="index"
-            v-model="collabLinks[index]"
-            :append-outer-icon="mdiPlusCircle"
-            :prepend-icon="mdiMinusCircle"
-            style="margin-left: 17px"
-            @click:prepend="deleteAuxLink(index)"
-            @click:append-outer="collabLinks.push('');"
-          />
-          <v-card-actions class="d-flex flex-row justify-center">
-            <v-btn @click="settingOKClick()">
-              Ok
-            </v-btn>
-          </v-card-actions>
-        </v-container>
-      </v-card>
-
-      <!-------  LOAD ACTIVE CHAT ------->
-      <v-card v-if="modalMode === 4">
-        <v-container>
-          <v-card-title>
-            Sync chat
-          </v-card-title>
-          <v-text-field v-model="activeURLStream" label="Stream Link" />
+          <v-text-field v-model="activeURLInput" label="Stream Link" />
           <v-card-actions>
             <v-btn @click="modalNexus = false">
               Cancel
             </v-btn>
 
-            <v-btn style="margin-left:auto" @click="loadChat(activeURLStream); modalNexus = false;">
+            <v-btn style="margin-left:auto" @click="loadChat(); modalNexus = false;">
               Ok
             </v-btn>
           </v-card-actions>
         </v-container>
       </v-card>
 
-      <!-------  UNLOAD ALL ACTIVE CHAT ------->
-      <v-card v-if="modalMode === 5">
-        <v-container>
-          <v-card-title>
-            Unload ALL active chat?
-          </v-card-title>
-          <v-card-actions>
-            <v-btn @click="modalNexus = false">
-              Cancel
-            </v-btn>
-
-            <v-btn style="margin-left:auto" @click="unloadAll(); modalNexus = false;">
-              Ok
-            </v-btn>
-          </v-card-actions>
-        </v-container>
-      </v-card>
-
-      <!-------  LOGGIN IN CHECK CHAT ------->
+      <!-------  LOGGIN IN CHECK ------->
       <v-card v-if="modalMode === 6">
         <v-container>
           <v-card-title>
@@ -382,18 +291,23 @@
 </template>
 
 <script lang="ts">
-import EnhancedEntry from "@/components/tlclient/EnhancedEntry.vue";
+import EnhancedEntry from "@/components/tlscripteditor/EnhancedEntry.vue";
 import { TL_LANGS } from "@/utils/consts";
 import { mdiPlusCircle, mdiMinusCircle, mdiCloseCircle } from "@mdi/js";
 import { getVideoIDFromUrl } from "@/utils/functions";
 import backendApi from "@/utils/backend-api";
 
+import Vue from "vue";
+import LoadScript from "vue-plugin-load-script";
+
+Vue.use(LoadScript);
+
 export default {
-    name: "Tlclient",
+    name: "Tlscripteditor",
     metaInfo() {
         return {
             get title() {
-                return "TLClient - Holodex";
+                return "TLScriptEditor - Holodex";
             },
         };
     },
@@ -407,7 +321,6 @@ export default {
             mdiMinusCircle,
             mdiCloseCircle,
             menuBool: false,
-            firstLoad: true,
             entries: [],
             profile: [{
                 Name: "Default",
@@ -423,7 +336,6 @@ export default {
             profileDisplay: false,
             profileDisplayTimer: undefined,
             inputString: "",
-            localPrefix: `[${TL_LANGS[0].value}] `,
             // ------ COLOUR -------
             colourPick: 0,
             colourDialogue: false,
@@ -436,15 +348,19 @@ export default {
             TLLang: TL_LANGS[0],
             mainStreamLink: "",
             collabLinks: [""],
-            // ---- ACTIVE CHAT ----
-            activeChat: [],
+            // ---- ACTIVE VIDEO ----
+            activeURLInput: "",
             activeURLStream: "",
+            vidPlayer: false,
+            vidIframeEle: null,
+            player: null,
+            IFOrigin: "",
             // ---- PRIVILIGE CHECK ----
             loginStatusText: "Checking login status...",
             loginStatus: 0, // 0: check login status, 1: check TL privilege, 2: not applied, 3: application rejected, 4: banned
             loginNoteText: "",
             applicationText: "",
-            loggedInTL: false,
+            loggedInTL: true,
         };
     },
     computed: {
@@ -454,11 +370,6 @@ export default {
                 "-webkit-text-stroke-color": (this.profile[this.profileIdx].OC === "") ? "unset" : this.profile[this.profileIdx].OC,
                 "-webkit-text-stroke-width": (this.profile[this.profileIdx].OC === "") ? "0px" : "1px",
             };
-        },
-        activeChatGridRow() {
-            return ({
-                "grid-template-rows": this.activeChat.length < 4 ? "1fr" : "1fr 1fr",
-            });
         },
         userdata() {
             return this.$store.state.userdata;
@@ -471,85 +382,12 @@ export default {
         this.checkLoginValidity();
     },
     methods: {
-        IFrameLoaded(event, target: string) {
-            for (let i = 0; i < this.activeChat.length; i += 1) {
-                if (this.activeChat[i].text === target) {
-                    this.activeChat[i].IFrameEle = event.target;
-                    switch (target.slice(0, 3)) {
-                        case "YT_":
-                            event.target.contentWindow?.postMessage({
-                                n: "HolodexSync",
-                                d: "Initiate",
-                            }, "https://www.youtube.com");
-                            break;
-
-                        case "TW_":
-                            event.target.contentWindow?.postMessage({
-                                n: "HolodexSync",
-                                d: "Initiate",
-                            }, "https://www.twitch.tv");
-                            break;
-
-                        default:
-                            break;
-                    }
-                }
-            }
-        },
         addEntry() {
             this.entries.push({
                 Time: Date.now(),
                 SText: this.profile[this.profileIdx].Prefix + this.inputString + this.profile[this.profileIdx].Suffix,
                 CC: this.profile[this.profileIdx].useCC ? this.profile[this.profileIdx].CC : "",
                 OC: this.profile[this.profileIdx].useOC ? this.profile[this.profileIdx].OC : "",
-            });
-
-            // SEND TO HOLODEX += 1
-            this.activeChat.forEach((e) => {
-                switch (e.text.slice(0, 3)) {
-                    case "YT_":
-                        e.IFrameEle?.contentWindow?.postMessage({
-                            n: "HolodexSync",
-                            d: this.localPrefix + this.profile[this.profileIdx].Prefix + this.inputString + this.profile[this.profileIdx].Suffix,
-                        }, "https://www.youtube.com");
-                        break;
-
-                    case "TW_":
-                        e.IFrameEle?.contentWindow?.postMessage({
-                            n: "HolodexSync",
-                            d: this.localPrefix + this.profile[this.profileIdx].Prefix + this.inputString + this.profile[this.profileIdx].Suffix,
-                        }, "https://www.twitch.tv");
-                        break;
-
-                    default:
-                        break;
-                }
-            });
-
-            // SEND TO API
-            backendApi.postTL({
-                time: Date.now(),
-                text: this.profile[this.profileIdx].Prefix + this.inputString + this.profile[this.profileIdx].Suffix,
-                cc: this.profile[this.profileIdx].useCC ? this.profile[this.profileIdx].CC : "",
-                oc: this.profile[this.profileIdx].useOC ? this.profile[this.profileIdx].OC : "",
-            }).then(({ status, data }) => {
-                if (status === 200) {
-                    console.log("SENT!");
-                } else {
-                    this.entries.push({
-                        Time: Date.now(),
-                        SText: `ERR : ${data}`,
-                        CC: "",
-                        OC: "",
-                    });
-                }
-            }).catch(() => {
-                this.entries.push({
-                    Time: Date.now(),
-                    SText: "FAILED SENDING TO DATABASE",
-                    CC: "",
-                    OC: "",
-                });
             });
 
             this.inputString = "";
@@ -562,16 +400,6 @@ export default {
         modalNexusOutsideClick() {
             if ((this.modalMode !== 3) && this.loggedInTL) {
                 this.modalNexus = false;
-            }
-        },
-        settingOKClick() {
-            this.modalNexus = false;
-            if (this.firstLoad) {
-                this.loadChat(this.mainStreamLink);
-                this.collabLinks.forEach((e) => {
-                    this.loadChat(e);
-                });
-                this.firstLoad = false;
             }
         },
         // ------------------------ PROFILE CONTROLLER ------------------------
@@ -660,50 +488,6 @@ export default {
                 clearInterval(this.profileDisplayTimer);
             }, 3000);
         },
-        //= ======================== PROFILE CONTROLLER ========================
-
-        // ---------------------- ACTIVE CHAT CONTROLLER ----------------------
-        unloadAll() {
-            this.activeChat = [];
-        },
-        closeActiveChat(idx: number) {
-            this.activeChat.splice(idx, 1);
-        },
-        URLExtender(s: string) {
-            switch (s.slice(0, 3)) {
-                case "YT_":
-                    return `https://www.youtube.com/live_chat?v=${s.slice(3)}&embed_domain=${window.location.hostname}`;
-
-                case "TW_":
-                    return `https://www.twitch.tv/embed/${s.slice(3)}/chat?parent=${window.location.hostname}`;
-
-                default:
-                    return "";
-            }
-        },
-        loadChat(s: string) {
-            const StreamURL = getVideoIDFromUrl(s);
-            if (StreamURL) {
-                switch (StreamURL.type) {
-                    case "twitch": {
-                        this.activeChat.push({
-                            text: `TW_${StreamURL.id}`,
-                            IFrameEle: undefined,
-                        });
-                        break;
-                    }
-
-                    default: {
-                        this.activeChat.push({
-                            text: `YT_${StreamURL.id}`,
-                            IFrameEle: undefined,
-                        });
-                        break;
-                    }
-                }
-            }
-        },
-        //= ====================== ACTIVE CHAT CONTROLLER ======================
         colourPickerClose() {
             if (this.colourPick === 1) {
                 this.profile[this.profileIdx].CC = this.colourTemp;
@@ -715,6 +499,360 @@ export default {
         colourPickerOK() {
             this.colourDialogue = false;
         },
+        //= ======================== PROFILE CONTROLLER ========================
+
+        // ---------------------- VIDEO CONTROLLER ----------------------
+        loadChat() {
+            this.activeURLStream = this.activeURLInput;
+            this.vidPlayer = true;
+            const StreamURL = getVideoIDFromUrl(this.activeURLStream);
+            switch (StreamURL.type) {
+                case "twitch":
+                    this.LoadvideoTW(StreamURL.id, true);
+                    break;
+
+                case "twitch_vod":
+                    this.LoadvideoTW(StreamURL.id, false);
+                    break;
+
+                case "twitcast":
+                    this.SetupIframeTC(StreamURL.id, StreamURL.id, true);
+                    break;
+
+                case "twitcast_vod":
+                    this.SetupIframeTC(StreamURL.id, StreamURL.channel.name, false);
+                    break;
+
+                case "niconico":
+                    // niconico doesn't allow third party player hosting... at least for now...
+                    // this.SetupIframeNC(StreamURL.id, true);
+                    break;
+
+                case "niconico_vod":
+                    this.SetupIframeNC(StreamURL.id, false);
+                    break;
+
+                case "bilibili":
+                    break;
+
+                case "bilibili_vod":
+                    this.SetupIframeBL(StreamURL.id);
+                    break;
+
+                default:
+                    this.LoadvideoYT(StreamURL.id);
+                    break;
+            }
+        },
+        SetupIframeTC(MID: string, UID: string, Live: boolean): void {
+            if (this.vidIframeEle) {
+                this.vidIframeEle.parentNode?.removeChild(this.vidIframeEle);
+            }
+            this.vidIframeEle = document.createElement("iframe");
+            if (Live) {
+                this.vidIframeEle.src = `https://twitcasting.tv/${UID}/embeddedplayer/live?auto_play=false&default_mute=false`;
+                this.vidIframeEle.loading = "lazy";
+            } else {
+                this.vidIframeEle.src = `https://twitcasting.tv/${UID}/embeddedplayer/${MID}?auto_play=false&default_mute=false`;
+            }
+            this.vidIframeEle.width = "100%";
+            this.vidIframeEle.height = "100%";
+            this.vidIframeEle.frameBorder = "0";
+
+            this.LoadIframe("TC");
+        },
+        SetupIframeBL(VID: string): void {
+            let embedID = "";
+            if (this.vidIframeEle) {
+                this.vidIframeEle.parentNode?.removeChild(this.vidIframeEle);
+            }
+
+            switch (VID.slice(0, 2).toLowerCase()) {
+                case "bv":
+                    embedID = `bvid=${VID.slice(2)}`;
+                    break;
+
+                case "av":
+                    embedID = `aid=${VID.slice(2)}`;
+                    break;
+
+                default:
+                    embedID = `cid=${VID}`;
+                    break;
+            }
+
+            this.vidIframeEle = document.createElement("iframe");
+            this.vidIframeEle.src = `https://player.bilibili.com/player.html?${embedID}&page=1&as_wide=1&high_quality=0&danmaku=0`;
+            this.vidIframeEle.width = "100%";
+            this.vidIframeEle.height = "100%";
+            this.vidIframeEle.frameBorder = "0";
+
+            this.LoadIframe("BL");
+        },
+        SetupIframeNC(VID: string, Live: boolean): void {
+            if (this.vidIframeEle) {
+                this.vidIframeEle.parentNode?.removeChild(this.vidIframeEle);
+            }
+
+            this.vidIframeEle = document.createElement("iframe");
+            if (Live) {
+                this.vidIframeEle.src = `https://live.nicovideo.jp/embed/${VID}`;
+            } else {
+                this.vidIframeEle.src = `https://embed.nicovideo.jp/watch/${VID}?autoplay=0`;
+            }
+            this.vidIframeEle.width = "100%";
+            this.vidIframeEle.height = "100%";
+            this.vidIframeEle.frameBorder = "0";
+            this.vidIframeEle.allow = "encrypted-media;";
+
+            this.LoadIframe("NC");
+        },
+
+        // -----------------  IFRAME  -----------------
+        TimePing(timestamp: number): void {
+            if (this.vidIframeEle?.contentWindow) {
+                this.vidIframeEle?.contentWindow.postMessage({
+                    n: "MChatXXMSync",
+                    d: timestamp,
+                }, this.IFOrigin);
+            }
+        },
+        StartPing(): void {
+            if (this.vidIframeEle?.contentWindow) {
+                this.vidIframeEle?.contentWindow.postMessage({
+                    n: "MChatXXMSync",
+                    d: "s",
+                }, this.IFOrigin);
+            }
+        },
+        ModePing(Mode: string): void {
+            switch (Mode) {
+                case "TC":
+                    this.IFOrigin = "https://twitcasting.tv";
+                    break;
+
+                case "NC":
+                    this.IFOrigin = "https://embed.nicovideo.jp";
+                    break;
+
+                case "BL":
+                    this.IFOrigin = "https://player.bilibili.com";
+                    break;
+
+                default:
+                    this.IFOrigin = "";
+                    break;
+            }
+
+            if (this.vidIframeEle?.contentWindow) {
+                this.vidIframeEle?.contentWindow.postMessage({
+                    n: "MChatXXMSync",
+                    d: Mode,
+                }, this.IFOrigin);
+            }
+        },
+        PausePing(): void {
+            if (this.vidIframeEle?.contentWindow) {
+                this.vidIframeEle?.contentWindow.postMessage({
+                    n: "MChatXXMSync",
+                    d: "p",
+                }, this.IFOrigin);
+            }
+        },
+        SwitchPing(): void {
+            if (this.vidIframeEle?.contentWindow) {
+                this.vidIframeEle?.contentWindow.postMessage({
+                    n: "MChatXXMSync",
+                    d: "w",
+                }, this.IFOrigin);
+            }
+        },
+        LoadIframe(Mode: string): void {
+            if (this.vidIframeEle) {
+                const PlayerDiv = document.getElementById("player");
+                if (PlayerDiv) {
+                    PlayerDiv.append(this.vidIframeEle);
+
+                    this.vidIframeEle.onload = () => {
+                        this.ModePing(Mode);
+                    };
+
+                    window.addEventListener("message", (e:any) => {
+                        this.SessionStorageListener(e);
+                    });
+                }
+            }
+        },
+        SessionStorageListener(e: any):void {
+            if (e.origin === this.IFOrigin) {
+                if (e.data.n === "MSyncXMChatX") {
+                    switch (e.data.d) {
+                        case "p":
+                            // this.PauseTracker = true;
+                            break;
+
+                        case "s":
+                            // this.PauseTracker = false;
+                            break;
+
+                        default:
+                            if (typeof e.data.d === "number") {
+                                /*
+                    this.TimerTime = e.data.d;
+                    this.ScrollCalculator();
+                    */
+                            }
+                            break;
+                    }
+                }
+            }
+        },
+        //= ================  IFRAME  =================
+
+        // -----------------  YT  -----------------
+        LoadvideoYT(VID: string) {
+            if (window.YT) {
+                this.startVideoYT(VID);
+                return;
+            }
+
+            const tag = document.createElement("script");
+            tag.src = "https://www.youtube.com/iframe_api";
+            const firstScriptTag = document.getElementsByTagName("script")[0];
+            if (firstScriptTag.parentNode) {
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            }
+
+            window.onYouTubeIframeAPIReady = () => this.startVideoYT(VID);
+        },
+        startVideoYT(VID: string) {
+            this.player = new window.YT.Player("player", {
+                videoId: VID,
+                playerVars: {
+                    playsinline: 1,
+                },
+                events: {
+                    onReady: this.ReadyStateYT.bind(this),
+                    onStateChange: this.onPlayerStateChangeYT.bind(this),
+                },
+            });
+        },
+        onPlayerStateChangeYT() {
+            // this.TogglePlayPauseYT();
+        },
+        ReadyStateYT() {
+            // this.PauseTracker = false;
+        },
+        TogglePlayPauseYT() {
+            /*
+          switch (this.player.getPlayerState()) {
+            case 1:
+              break;
+
+            case 2:
+              this.StopTimer(false);
+              break;
+
+            case 3:
+              break;
+          }
+          */
+        },
+        StartTrackerYT(): void {
+            /*
+          this.PauseTracker = true;
+          if (this.TrackerDelegate) {
+            clearInterval(this.TrackerDelegate);
+            this.TrackerDelegate = undefined;
+          }
+
+            this.TrackerDelegate = setInterval(() => {
+            if (!this.PauseTracker) {
+              this.TimerTime = this.player.getCurrentTime()*1000;
+            }
+            this.ScrollCalculator();
+          }, 20);
+          */
+        },
+        //= ================  YT  =================
+
+        // -----------------  TW  -----------------
+        LoadvideoTW(VID:string, Live: boolean) {
+            if (window.Twitch) {
+                this.startVideoTW(VID, Live);
+                return;
+            }
+
+            const tag = document.createElement("script");
+            tag.src = "https://player.twitch.tv/js/embed/v1.js";
+            const firstScriptTag = document.getElementsByTagName("script")[0];
+            if (firstScriptTag.parentNode) {
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            }
+
+            const Checker = setInterval(() => {
+                if (window.Twitch) {
+                    clearInterval(Checker);
+                    this.startVideoTW(VID, Live);
+                }
+            }, 1000);
+        },
+        startVideoTW(VID: string, Live: boolean) {
+            if (Live) {
+                this.player = new window.Twitch.Player("player", {
+                    width: "100%",
+                    height: "100%",
+                    channel: VID,
+                    autoplay: false,
+                    time: "0h0m0s",
+                });
+            } else {
+                this.player = new window.Twitch.Player("player", {
+                    width: "100%",
+                    height: "100%",
+                    video: VID,
+                    autoplay: false,
+                    time: "0h0m0s",
+                });
+            }
+
+            this.player.addEventListener(window.Twitch.Player.PAUSE, () => {
+            // this.PauseTracker = true;
+            });
+
+            this.player.addEventListener(window.Twitch.Player.PLAY, () => {
+            // this.PauseTracker = false;
+            });
+
+            this.player.addEventListener(window.Twitch.Player.SEEK, (e: any) => {
+                this.TimerTime = e.position * 1000;
+            /*
+            this.ScrollCalculator();
+            */
+            });
+        },
+        StartTrackerTW(): void {
+            /*
+          this.PauseTracker = true;
+          if (this.TrackerDelegate) {
+            clearInterval(this.TrackerDelegate);
+            this.TrackerDelegate = undefined;
+          }
+
+          this.TimeSaddle = Date.now();
+          this.TrackerDelegate = setInterval(() => {
+            if ((Date.now() - this.TimeSaddle < 1000) && (!this.PauseTracker)) {
+              this.TimerTime += Date.now() - this.TimeSaddle;
+            }
+            this.TimeSaddle = Date.now();
+            this.ScrollCalculator();
+          }, 20);
+          */
+        },
+        //= ================  TW  =================
+
+        //= ====================== VIDEO CONTROLLER ======================
+
         // ------------------------ LOGIN STATUS CHECK ------------------------
         async checkLoginValidity() {
             const check = await backendApi.loginIsValid(this.userdata.jwt);
@@ -829,9 +967,5 @@ export default {
 .ChatPanelContainer{
   display: grid;
   grid-auto-flow: column;
-}
-.activeChatIFrame{
-  width: 100%;
-  height: 100%;
 }
 </style>

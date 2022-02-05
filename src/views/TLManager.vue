@@ -413,17 +413,17 @@ export default {
         reloadList() {
             this.selectedIndex = -1;
             /*
-        this.entryList = [];
-        for (let i = 0; i < 10; i = i + 1) {
-          this.entryList.push({
-            id: i,
-            username: `username ${i}`,
-            note: `note ${i}`,
-            applynote: `applynote ${i}`,
-            bantime: Date.now() + i * 1000 * 50,
-          });
-        }
-        */
+            this.entryList = [];
+            for (let i = 0; i < 10; i = i + 1) {
+              this.entryList.push({
+                id: i,
+                username: `username ${i}`,
+                note: `note ${i}`,
+                applynote: `applynote ${i}`,
+                bantime: Date.now() + i * 1000 * 50,
+              });
+            }
+            */
 
             let stat = "";
             switch (this.tabIndex) {

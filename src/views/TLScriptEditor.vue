@@ -33,17 +33,41 @@
         Menu
       </v-btn>
       <div class="d-flex align-stretch flex-row" style="height:100%" @click="menuBool = false">
-        <v-card class="ChatOuterContainer grow" height="100%;" width="auto">
-          <v-container class="ChatInnerContainer d-flex flex-column">
-            <EnhancedEntry
-              v-for="(dt, index) in entries"
-              :key="index"
-              :time="dt.Time"
-              :stext="dt.SText"
-              :cc="dt.CC"
-              :oc="dt.OC"
-            />
-          </v-container>
+        <v-card
+          class="grow"
+          color="red"
+          height="100%"
+          width="auto"
+        >
+          <!--
+            <v-simple-table
+                fixed-header
+                height="100%"
+                width="auto"
+            >
+                <template v-slot:default>
+                    <thead>
+                        <tr>
+                            <th class="text-left">Start</th>
+                            <th class="text-left">End</th>
+                            <th class="text-left">Text</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template v-for="(entry, index) in entries">
+                            <Entrytr
+                                :key="index"
+                                :time="entry.Time"
+                                :end="entry.End"
+                                :stext="entry.SText"
+                                :cc="entry.CC"
+                                :oc="entry.OC"
+                            />
+                        </template>
+                    </tbody>
+                </template>
+            </v-simple-table>
+            -->
           <v-card v-if="profileDisplay" class="ProfileListCard d-flex flex-column">
             <span v-for="(prf, index) in profile" :key="index"><span v-if="index === profileIdx">> </span>{{ (index + 1) + '. ' + prf.Name }}</span>
           </v-card>
@@ -73,7 +97,9 @@
             height="100%"
             width="100%"
           />
-          <v-card-actions class="d-flex flex-row justify-center">
+          <v-card-actions
+            class="d-flex flex-row justify-center"
+          >
             <v-btn small @click="timerTimeStop();">
               <v-icon dark>
                 {{ mdiStop }}
@@ -293,7 +319,7 @@
             <v-card-subtitle>
               {{ (loginNoteText === '') ? '' : 'Message from reviewer : ' + loginNoteText }}
             </v-card-subtitle>
-            <v-text-field v-if="loginStatus != 4" v-model="applicationText" label="Note" />
+            <v-text-field v-if="loginStatus !== 4" v-model="applicationText" label="Note" />
             <v-divider />
           </v-card>
 
@@ -321,7 +347,8 @@
 </template>
 
 <script lang="ts">
-import EnhancedEntry from "@/components/tlscripteditor/EnhancedEntry.vue";
+// import EnhancedEntry from "@/components/tlscripteditor/EnhancedEntry.vue";
+// import Entrytr from "@/components/tlscripteditor/Entrytr.vue";
 import { TL_LANGS } from "@/utils/consts";
 import { mdiPlay, mdiStop } from "@mdi/js";
 import { getVideoIDFromUrl } from "@/utils/functions";
@@ -342,7 +369,8 @@ export default {
         };
     },
     components: {
-        EnhancedEntry,
+        // EnhancedEntry,
+        // Entrytr,
     },
     data() {
         return {
@@ -395,6 +423,8 @@ export default {
             timerTime: 0,
             timerDelegate: undefined,
             timeSaddle: Date.now(),
+            refreshRate: 33,
+            trackerPause: true,
         };
     },
     computed: {
@@ -456,16 +486,44 @@ export default {
     mounted() {
         this.checkLoginValidity();
     },
+    beforeDestroy() {
+        this.unloadVideo();
+    },
     methods: {
         addEntry() {
-            this.entries.push({
-                Time: Date.now(),
+            const dt = {
+                Time: this.timerTime,
+                End: this.timerTime + 3000,
                 SText: this.profile[this.profileIdx].Prefix + this.inputString + this.profile[this.profileIdx].Suffix,
                 CC: this.profile[this.profileIdx].useCC ? this.profile[this.profileIdx].CC : "",
                 OC: this.profile[this.profileIdx].useOC ? this.profile[this.profileIdx].OC : "",
-            });
+            };
 
-            this.inputString = "";
+            let inserted:boolean = false;
+            for (let i = 0; i < this.entries.length; i += 1) {
+                if (this.entries[i].Stime > dt.Time) {
+                    if (i > 0) {
+                        this.entries[i - 1].End = dt.Time;
+                    }
+
+                    if (i < this.entries.length) {
+                        dt.End = this.entries[i].Time;
+                    }
+
+                    this.entries.splice(i, 0, dt);
+                    inserted = true;
+                    this.inputString = "";
+                    return;
+                }
+            }
+
+            if (!inserted) {
+                if (this.entries.length !== 0) {
+                    this.entries[this.entries.length - 1].End = dt.Time;
+                }
+                this.entries.push(dt);
+                this.inputString = "";
+            }
         },
         deleteAuxLink(idx: number) {
             if (this.collabLinks.length !== 1) {
@@ -490,25 +548,25 @@ export default {
                         break;
 
                     case "twitcast":
-
+                        this.startPing();
                         break;
 
                     case "twitcast_vod":
-
+                        this.startPing();
                         break;
 
                     case "niconico":
                         break;
 
                     case "niconico_vod":
-
+                        this.startPing();
                         break;
 
                     case "bilibili":
                         break;
 
                     case "bilibili_vod":
-
+                        this.startPing();
                         break;
 
                     default:
@@ -523,7 +581,7 @@ export default {
                     }
                     this.timeSaddle = Date.now();
                 // this.ScrollCalculator();
-                }, 20);
+                }, this.refreshRate);
             }
         },
         timerTimeStop() {
@@ -538,25 +596,25 @@ export default {
                         break;
 
                     case "twitcast":
-
+                        this.pausePing();
                         break;
 
                     case "twitcast_vod":
-
+                        this.pausePing();
                         break;
 
                     case "niconico":
                         break;
 
                     case "niconico_vod":
-
+                        this.pausePing();
                         break;
 
                     case "bilibili":
                         break;
 
                     case "bilibili_vod":
-
+                        this.pausePing();
                         break;
 
                     default:
@@ -572,33 +630,33 @@ export default {
             if (this.vidPlayer) {
                 switch (this.vidType) {
                     case "twitch":
-                        this.player.seek(this.TimerTime / 1000 + time / 1000);
+                        // NO
                         break;
 
                     case "twitch_vod":
-                        this.player.seek(this.TimerTime / 1000 + time / 1000);
+                        this.player.seek(this.timerTime / 1000 + time / 1000);
                         break;
 
                     case "twitcast":
-
+                        // NO
                         break;
 
                     case "twitcast_vod":
-
+                        this.timePing(time);
                         break;
 
                     case "niconico":
                         break;
 
                     case "niconico_vod":
-
+                        this.timePing(time);
                         break;
 
                     case "bilibili":
                         break;
 
                     case "bilibili_vod":
-
+                        this.timePing(time);
                         break;
 
                     default:
@@ -637,25 +695,25 @@ export default {
                         break;
 
                     case "twitcast":
-
+                        this.switchPing();
                         break;
 
                     case "twitcast_vod":
-
+                        this.switchPing();
                         break;
 
                     case "niconico":
                         break;
 
                     case "niconico_vod":
-
+                        this.switchPing();
                         break;
 
                     case "bilibili":
                         break;
 
                     case "bilibili_vod":
-
+                        this.switchPing();
                         break;
 
                     default:
@@ -790,28 +848,28 @@ export default {
                         this.vidType = StreamURL.type;
                         switch (StreamURL.type) {
                             case "twitch":
-                                this.LoadvideoTW(StreamURL.id, true);
+                                this.loadVideoTW(StreamURL.id, true);
                                 break;
 
                             case "twitch_vod":
-                                this.LoadvideoTW(StreamURL.id, false);
+                                this.loadVideoTW(StreamURL.id, false);
                                 break;
 
                             case "twitcast":
-                                this.SetupIframeTC(StreamURL.id, StreamURL.id, true);
+                                this.setupIframeTC(StreamURL.id, StreamURL.id, true);
                                 break;
 
                             case "twitcast_vod":
-                                this.SetupIframeTC(StreamURL.id, StreamURL.channel.name, false);
+                                this.setupIframeTC(StreamURL.id, StreamURL.channel.name, false);
                                 break;
 
                             case "niconico":
                                 // niconico doesn't allow third party player hosting... at least for now...
-                                // this.SetupIframeNC(StreamURL.id, true);
+                                // this.setupIframeNC(StreamURL.id, true);
                                 break;
 
                             case "niconico_vod":
-                                this.SetupIframeNC(StreamURL.id, false);
+                                this.setupIframeNC(StreamURL.id, false);
                                 break;
 
                             case "bilibili":
@@ -820,18 +878,46 @@ export default {
                                 break;
 
                             case "bilibili_vod":
-                                this.SetupIframeBL(StreamURL.id);
+                                this.setupIframeBL(StreamURL.id);
                                 break;
 
                             default:
-                                this.LoadvideoYT(StreamURL.id);
+                                this.loadVideoYT(StreamURL.id);
                                 break;
                         }
                     }
                 }
             }, 1000);
         },
-        SetupIframeTC(MID: string, UID: string, Live: boolean): void {
+        unloadVideo() {
+            this.vidPlayer = false;
+            if (this.timerDelegate) {
+                clearInterval(this.timerDelegate);
+                this.timerDelegate = undefined;
+            }
+
+            if (this.vidIframeEle) {
+                window.removeEventListener("message", (e:any) => {
+                    this.iframeVideoListener(e);
+                });
+            }
+
+            if (((this.vidType === "twitch") || (this.vidType === "twitch_vod")) && (window.Twitch)) {
+                this.player.removeEventListener(window.Twitch.Player.PAUSE, () => {
+                    this.pauseTracker = true;
+                });
+
+                this.player.removeEventListener(window.Twitch.Player.PLAY, () => {
+                    this.pauseTracker = false;
+                });
+
+                this.player.removeEventListener(window.Twitch.Player.SEEK, (e: any) => {
+                    this.timerTime = e.position * 1000;
+                    // this.ScrollCalculator();
+                });
+            }
+        },
+        setupIframeTC(MID: string, UID: string, Live: boolean): void {
             if (this.vidIframeEle) {
                 this.vidIframeEle.parentNode?.removeChild(this.vidIframeEle);
             }
@@ -846,9 +932,9 @@ export default {
             this.vidIframeEle.height = "100%";
             this.vidIframeEle.frameBorder = "0";
 
-            this.LoadIframe("TC");
+            this.loadIframe("TC");
         },
-        SetupIframeBL(VID: string): void {
+        setupIframeBL(VID: string): void {
             let embedID = "";
             if (this.vidIframeEle) {
                 this.vidIframeEle.parentNode?.removeChild(this.vidIframeEle);
@@ -874,9 +960,9 @@ export default {
             this.vidIframeEle.height = "100%";
             this.vidIframeEle.frameBorder = "0";
 
-            this.LoadIframe("BL");
+            this.loadIframe("BL");
         },
-        SetupIframeNC(VID: string, Live: boolean): void {
+        setupIframeNC(VID: string, Live: boolean): void {
             if (this.vidIframeEle) {
                 this.vidIframeEle.parentNode?.removeChild(this.vidIframeEle);
             }
@@ -892,27 +978,19 @@ export default {
             this.vidIframeEle.frameBorder = "0";
             this.vidIframeEle.allow = "encrypted-media;";
 
-            this.LoadIframe("NC");
+            this.loadIframe("NC");
         },
 
         // -----------------  IFRAME  -----------------
-        TimePing(timestamp: number): void {
+        timePing(timestamp: number): void {
             if (this.vidIframeEle?.contentWindow) {
                 this.vidIframeEle?.contentWindow.postMessage({
-                    n: "MChatXXMSync",
+                    n: "HolodexSync",
                     d: timestamp,
                 }, this.IFOrigin);
             }
         },
-        StartPing(): void {
-            if (this.vidIframeEle?.contentWindow) {
-                this.vidIframeEle?.contentWindow.postMessage({
-                    n: "MChatXXMSync",
-                    d: "s",
-                }, this.IFOrigin);
-            }
-        },
-        ModePing(Mode: string): void {
+        modePing(Mode: string): void {
             switch (Mode) {
                 case "TC":
                     this.IFOrigin = "https://twitcasting.tv";
@@ -933,78 +1011,65 @@ export default {
 
             if (this.vidIframeEle?.contentWindow) {
                 this.vidIframeEle?.contentWindow.postMessage({
-                    n: "MChatXXMSync",
+                    n: "HolodexSync",
                     d: Mode,
                 }, this.IFOrigin);
             }
         },
-        PausePing(): void {
+        startPing(): void {
             if (this.vidIframeEle?.contentWindow) {
                 this.vidIframeEle?.contentWindow.postMessage({
-                    n: "MChatXXMSync",
+                    n: "HolodexSync",
+                    d: "s",
+                }, this.IFOrigin);
+            }
+        },
+        pausePing(): void {
+            if (this.vidIframeEle?.contentWindow) {
+                this.vidIframeEle?.contentWindow.postMessage({
+                    n: "HolodexSync",
                     d: "p",
                 }, this.IFOrigin);
             }
         },
-        SwitchPing(): void {
+        switchPing(): void {
             if (this.vidIframeEle?.contentWindow) {
                 this.vidIframeEle?.contentWindow.postMessage({
-                    n: "MChatXXMSync",
+                    n: "HolodexSync",
                     d: "w",
                 }, this.IFOrigin);
             }
         },
-        LoadIframe(Mode: string): void {
+        loadIframe(Mode: string): void {
             if (this.vidIframeEle) {
                 const PlayerDiv = document.getElementById("player");
                 if (PlayerDiv) {
                     PlayerDiv.append(this.vidIframeEle);
 
                     this.vidIframeEle.onload = () => {
-                        this.ModePing(Mode);
+                        this.modePing(Mode);
                     };
 
                     window.addEventListener("message", (e:any) => {
-                        this.SessionStorageListener(e);
+                        this.iframeVideoListener(e);
                     });
                 }
             }
         },
-        SessionStorageListener(e: any):void {
+        iframeVideoListener(e: any):void {
             if (e.origin === this.IFOrigin) {
-                if (e.data.n === "MSyncXMChatX") {
-                    switch (e.data.d) {
-                        case "p":
-                            // this.PauseTracker = true;
-                            break;
-
-                        case "s":
-                            // this.PauseTracker = false;
-                            break;
-
-                        default:
-                            if (typeof e.data.d === "number") {
-                                /*
-                    this.TimerTime = e.data.d;
-                    this.ScrollCalculator();
-                    */
-                            }
-                            break;
+                if (e.data.n === "SyncHolodex") {
+                    if (typeof e.data.d === "number") {
+                        this.timerTime = e.data.d;
+                        // this.ScrollCalculator();
                     }
                 }
-            }
-        },
-        unloadVideo() {
-            this.vidPlayer = false;
-            if (this.timerDelegate) {
-                clearInterval(this.timerDelegate);
-                this.timerDelegate = undefined;
             }
         },
         //= ================  IFRAME  =================
 
         // -----------------  YT  -----------------
-        LoadvideoYT(VID: string) {
+        loadVideoYT(VID: string) {
             if (window.YT) {
                 this.startVideoYT(VID);
                 return;
@@ -1026,14 +1091,14 @@ export default {
                     playsinline: 1,
                 },
                 events: {
-                    onReady: this.ReadyStateYT.bind(this),
+                    onReady: this.readyStateYT.bind(this),
                 },
             });
         },
-        ReadyStateYT() {
-            this.StartTrackerYT();
+        readyStateYT() {
+            this.startTrackerYT();
         },
-        StartTrackerYT(): void {
+        startTrackerYT(): void {
             if (this.timerDelegate) {
                 clearInterval(this.timerDelegate);
                 this.timerDelegate = undefined;
@@ -1041,12 +1106,13 @@ export default {
             this.timerDelegate = setInterval(() => {
                 this.timerTime = this.player.getCurrentTime() * 1000;
             // this.ScrollCalculator();
-            }, 20);
+            }, 100);
         },
         //= ================  YT  =================
 
         // -----------------  TW  -----------------
-        LoadvideoTW(VID:string, Live: boolean) {
+        loadVideoTW(VID:string, Live: boolean) {
+            this.startTWTracker();
             if (window.Twitch) {
                 this.startVideoTW(VID, Live);
                 return;
@@ -1086,11 +1152,11 @@ export default {
             }
 
             this.player.addEventListener(window.Twitch.Player.PAUSE, () => {
-            // this.PauseTracker = true;
+                this.trackerPause = true;
             });
 
             this.player.addEventListener(window.Twitch.Player.PLAY, () => {
-            // this.PauseTracker = false;
+                this.trackerPause = false;
             });
 
             this.player.addEventListener(window.Twitch.Player.SEEK, (e: any) => {
@@ -1098,23 +1164,20 @@ export default {
                 // this.ScrollCalculator();
             });
         },
-        StartTrackerTW(): void {
-            /*
-          this.PauseTracker = true;
-          if (this.TrackerDelegate) {
-            clearInterval(this.TrackerDelegate);
-            this.TrackerDelegate = undefined;
-          }
-
-          this.TimeSaddle = Date.now();
-          this.TrackerDelegate = setInterval(() => {
-            if ((Date.now() - this.TimeSaddle < 1000) && (!this.PauseTracker)) {
-              this.TimerTime += Date.now() - this.TimeSaddle;
+        startTWTracker() {
+            this.trackerPause = true;
+            if (this.timerDelegate) {
+                clearInterval(this.timerDelegate);
             }
-            this.TimeSaddle = Date.now();
-            this.ScrollCalculator();
-          }, 20);
-          */
+
+            this.timeSaddle = Date.now();
+            this.timerDelegate = setInterval(() => {
+                if ((Date.now() - this.timeSaddle < 1000) && (!this.trackerPause)) {
+                    this.timerTime += Date.now() - this.timeSaddle;
+                }
+                this.timeSaddle = Date.now();
+                // this.ScrollCalculator();
+            }, this.refreshRate);
         },
         //= ================  TW  =================
 
@@ -1214,14 +1277,6 @@ export default {
   left:0px;
   z-index: 1;
 }
-.ChatOuterContainer{
-  overflow-y: auto;
-}
-.ChatInnerContainer{
-  position: absolute;
-  bottom: 0px;
-  width: 100%;
-}
 .ColourButton {
   margin-top: 19px;
   margin-left: 5px;
@@ -1239,5 +1294,6 @@ export default {
   position: absolute;
   top: 5px;
   right: 5px;
+  z-index: 1;
 }
 </style>

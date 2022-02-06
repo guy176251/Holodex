@@ -2,7 +2,8 @@
   <tr>
     <td>{{ timeStampStart }}</td>
     <td>{{ timeStampEnd }}</td>
-    <td class="EntryContainer" :style="textStyle">
+    <td>{{ profileName }}</td>
+    <td class="EntryContainer" :style="textStyle" colspan="2">
       {{ stext }}
     </td>
   </tr>
@@ -19,6 +20,10 @@ export default {
         end: {
             type: Number,
             default: 0,
+        },
+        profileName: {
+            type: String,
+            default: "",
         },
         stext: {
             type: String,

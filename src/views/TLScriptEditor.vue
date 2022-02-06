@@ -34,56 +34,64 @@
       </v-btn>
       <div class="d-flex align-stretch flex-row" style="height:100%" @click="menuBool = false">
         <v-card
+          ref="tableContainer"
           class="grow"
-          color="red"
           height="100%"
           width="auto"
         >
-          <!--
-            <v-simple-table
-                fixed-header
-                height="100%"
-                width="auto"
-            >
-                <template v-slot:default>
-                    <thead>
-                        <tr>
-                            <th class="text-left">Start</th>
-                            <th class="text-left">End</th>
-                            <th class="text-left">Text</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template v-for="(entry, index) in entries">
-                            <Entrytr
-                                :key="index"
-                                :time="entry.Time"
-                                :end="entry.End"
-                                :stext="entry.SText"
-                                :cc="entry.CC"
-                                :oc="entry.OC"
-                            />
-                        </template>
-                    </tbody>
-                </template>
-            </v-simple-table>
-            -->
+          <v-simple-table
+            :fixed-header="!menuBool"
+            :height="tableHeightCalculator"
+            width="auto"
+          >
+            <thead>
+              <tr>
+                <th class="text-left">
+                  Start
+                </th>
+                <th class="text-left">
+                  End
+                </th>
+                <th class="text-left">
+                  Profile
+                </th>
+                <th class="text-left" style="width: 100%">
+                  Text
+                </th>
+                <th>
+                  <v-card-actions v-if="!vidPlayer" class="ControlBox d-flex flex-row">
+                    <v-btn small @click="timerTimeStop();">
+                      <v-icon dark>
+                        {{ mdiStop }}
+                      </v-icon>
+                    </v-btn>
+                    <span>{{ timerPrint }}</span>
+                    <v-btn small @click="timerTimeStart();">
+                      <v-icon dark>
+                        {{ mdiPlay }}
+                      </v-icon>
+                    </v-btn>
+                  </v-card-actions>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="(entry, index) in entries">
+                <Entrytr
+                  :key="index"
+                  :time="entry.Time"
+                  :end="entry.End"
+                  :stext="entry.SText"
+                  :profile-name="profile[entry.Profile].Name"
+                  :cc="profile[entry.Profile].useCC ? profile[entry.Profile].CC : ''"
+                  :oc="profile[entry.Profile].useOC ? profile[entry.Profile].OC : ''"
+                />
+              </template>
+            </tbody>
+          </v-simple-table>
           <v-card v-if="profileDisplay" class="ProfileListCard d-flex flex-column">
             <span v-for="(prf, index) in profile" :key="index"><span v-if="index === profileIdx">> </span>{{ (index + 1) + '. ' + prf.Name }}</span>
           </v-card>
-          <v-card-actions v-if="!vidPlayer" class="ControlBox d-flex flex-row">
-            <v-btn small @click="timerTimeStop();">
-              <v-icon dark>
-                {{ mdiStop }}
-              </v-icon>
-            </v-btn>
-            <span>{{ timerPrint }}</span>
-            <v-btn small @click="timerTimeStart();">
-              <v-icon dark>
-                {{ mdiPlay }}
-              </v-icon>
-            </v-btn>
-          </v-card-actions>
         </v-card>
         <v-card
           v-if="vidPlayer"
@@ -348,7 +356,7 @@
 
 <script lang="ts">
 // import EnhancedEntry from "@/components/tlscripteditor/EnhancedEntry.vue";
-// import Entrytr from "@/components/tlscripteditor/Entrytr.vue";
+import Entrytr from "@/components/tlscripteditor/Entrytr.vue";
 import { TL_LANGS } from "@/utils/consts";
 import { mdiPlay, mdiStop } from "@mdi/js";
 import { getVideoIDFromUrl } from "@/utils/functions";
@@ -370,7 +378,7 @@ export default {
     },
     components: {
         // EnhancedEntry,
-        // Entrytr,
+        Entrytr,
     },
     data() {
         return {
@@ -393,6 +401,7 @@ export default {
             profileDisplay: false,
             profileDisplayTimer: undefined,
             inputString: "",
+            tableHeight: 0,
             // ------ COLOUR -------
             colourPick: 0,
             colourDialogue: false,
@@ -428,6 +437,9 @@ export default {
         };
     },
     computed: {
+        tableHeightCalculator() {
+            return (`${this.tableHeight}px`);
+        },
         textStyle() {
             return {
                 "-webkit-text-fill-color": (this.profile[this.profileIdx].CC === "") ? "unset" : this.profile[this.profileIdx].CC,
@@ -486,22 +498,40 @@ export default {
     mounted() {
         this.checkLoginValidity();
     },
+    created() {
+        window.addEventListener("resize", this.onResize);
+        const checker = setInterval(() => {
+            this.tableHeight = this.$refs.tableContainer.$el.clientHeight - 20;
+            if (this.tableHeight !== 0) {
+                clearInterval(checker);
+            }
+        }, 33);
+    },
     beforeDestroy() {
         this.unloadVideo();
+        window.removeEventListener("resize", this.onResize);
     },
     methods: {
+        onResize() {
+            this.tableHeight = 0;
+            const checker = setInterval(() => {
+                this.tableHeight = this.$refs.tableContainer.$el.clientHeight - 20;
+                if (this.tableHeight !== 0) {
+                    clearInterval(checker);
+                }
+            }, 33);
+        },
         addEntry() {
             const dt = {
                 Time: this.timerTime,
                 End: this.timerTime + 3000,
                 SText: this.profile[this.profileIdx].Prefix + this.inputString + this.profile[this.profileIdx].Suffix,
-                CC: this.profile[this.profileIdx].useCC ? this.profile[this.profileIdx].CC : "",
-                OC: this.profile[this.profileIdx].useOC ? this.profile[this.profileIdx].OC : "",
+                Profile: this.profileIdx,
             };
 
             let inserted:boolean = false;
             for (let i = 0; i < this.entries.length; i += 1) {
-                if (this.entries[i].Stime > dt.Time) {
+                if (this.entries[i].Time > dt.Time) {
                     if (i > 0) {
                         this.entries[i - 1].End = dt.Time;
                     }
@@ -798,6 +828,11 @@ export default {
         },
         deleteProfile() {
             if (this.profileIdx !== 0) {
+                this.entries.filter((e) => e.Profile === this.profileIdx).map((e) => {
+                    e.Profile = 0;
+                    return (e);
+                });
+
                 this.profileIdx -= 1;
                 this.profile.splice(this.profileIdx + 1, 1);
             }

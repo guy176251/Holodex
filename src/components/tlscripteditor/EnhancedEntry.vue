@@ -1,9 +1,6 @@
 <template>
-  <span class="EntryContainer">
-    {{ timeStamp }} :
-    <span :style="textStyle">
-      {{ stext }}
-    </span>
+  <span class="EntryContainer2" :style="textStyle">
+    {{ stext }}
   </span>
 </template>
 
@@ -11,10 +8,6 @@
 export default {
     name: "EnhancedEntry",
     props: {
-        time: {
-            type: Number,
-            default: 0,
-        },
         stext: {
             type: String,
             default: "",
@@ -29,47 +22,6 @@ export default {
         },
     },
     computed: {
-        timeStamp() {
-            let timeRaw = this.time;
-            let timeString = "";
-
-            let t = Math.floor(timeRaw / 60 / 60 / 1000);
-            timeRaw -= t * 60 * 60 * 1000;
-            if (t < 10) {
-                timeString += `0${t.toString()}`;
-            } else {
-                timeString += t.toString();
-            }
-            timeString += ":";
-
-            t = Math.floor(timeRaw / 60 / 1000);
-            timeRaw -= t * 60 * 1000;
-            if (t < 10) {
-                timeString += `0${t.toString()}`;
-            } else {
-                timeString += t.toString();
-            }
-            timeString += ":";
-
-            t = Math.floor(timeRaw / 1000);
-            timeRaw -= t * 1000;
-            if (t < 10) {
-                timeString += `0${t.toString()}`;
-            } else {
-                timeString += t.toString();
-            }
-            timeString += ".";
-
-            if (timeRaw > 100) {
-                timeString += timeRaw.toString().slice(0, 2);
-            } else if (timeRaw > 10) {
-                timeString += `0${timeRaw.toString().slice(0, 1)}`;
-            } else {
-                timeString += "00";
-            }
-
-            return timeString;
-        },
         textStyle() {
             return {
                 "-webkit-text-fill-color": (this.cc === "") ? "unset" : this.cc,
@@ -82,7 +34,9 @@ export default {
 </script>
 
 <style>
-.EntryContainer {
+.EntryContainer2 {
     font-weight: bold;
+    text-align: center;
+    margin: 2px 4px 2px 4px;
 }
 </style>

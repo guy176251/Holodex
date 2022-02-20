@@ -37,14 +37,14 @@
           ref="tableContainer"
           class="grow"
           height="100%"
-          width="auto"
+          width="50%"
         >
           <v-simple-table
             :fixed-header="!menuBool"
             :height="tableHeightCalculator"
             width="auto"
           >
-            <thead>
+            <thead @click="selectedEntry = -1;">
               <tr>
                 <th class="text-left">
                   Start
@@ -78,6 +78,7 @@
             <tbody>
               <template v-for="(entry, index) in entries">
                 <Entrytr
+                  v-if="selectedEntry !== index"
                   :key="index"
                   :time="entry.Time"
                   :end="entry.End"
@@ -85,7 +86,44 @@
                   :profile-name="profile[entry.Profile].Name"
                   :cc="profile[entry.Profile].useCC ? profile[entry.Profile].CC : ''"
                   :oc="profile[entry.Profile].useOC ? profile[entry.Profile].OC : ''"
+                  @click.native="selectedEntry = index;"
                 />
+                <tr v-if="selectedEntry === index" :key="index">
+                  <td>{{ timeStampStart }}</td>
+                  <td>{{ timeStampEnd }}</td>
+                  <td>
+                    <v-select
+                      v-model="entry.Profile"
+                      :items="profileListPicker"
+                      item-text="name"
+                      item-value="idx"
+                      single-line
+                    />
+                  </td>
+                  <td colspan="2">
+                    <v-text-field v-model="entry.SText" class="font-weight: bold;" :style="textStyle2" />
+                  </td>
+                </tr>
+                <tr
+                  v-if="selectedEntry === index"
+                  :key="index + 'control'"
+                >
+                  <td colspan="5">
+                    <v-card-actions
+                      class="d-flex flex-row justify-space-around"
+                    >
+                      <v-btn @click="modalMode = 4; modalNexus = true">
+                        Set as start
+                      </v-btn>
+                      <v-btn @click="shiftToCurrentTime();">
+                        Shift to current time
+                      </v-btn>
+                      <v-btn @click="deleteEntry();">
+                        Delete entry
+                      </v-btn>
+                    </v-card-actions>
+                  </td>
+                </tr>
               </template>
             </tbody>
           </v-simple-table>
@@ -105,6 +143,16 @@
             height="100%"
             width="100%"
           />
+          <v-card
+            class="d-flex flex-row justify-center"
+          >
+            <EnhancedEntry
+              v-if="displayEntry >= 0"
+              :stext="entries[displayEntry].SText"
+              :cc="profile[entries[displayEntry].Profile].useCC ? profile[entries[displayEntry].Profile].CC : ''"
+              :oc="profile[entries[displayEntry].Profile].useOC ? profile[entries[displayEntry].Profile].OC : ''"
+            />
+          </v-card>
           <v-card-actions
             class="d-flex flex-row justify-center"
           >
@@ -142,6 +190,10 @@
         @keydown.ctrl.left="ctrlLeft()"
         @keydown.ctrl.right="ctrlRight()"
       >
+        <v-row class="align-baseline">
+          <v-divider />
+          <v-divider />
+        </v-row>
         <v-row class="align-baseline">
           <v-text-field
             v-model="inputString"
@@ -244,6 +296,7 @@
       1 Add profile
       2 Remove Profile
       3 Load Stream
+      4 Set as Start
       6 Login Check
     -->
     <v-dialog
@@ -315,6 +368,24 @@
         </v-container>
       </v-card>
 
+      <!-------  SET START ENTRY  ------->
+      <v-card v-if="modalMode === 4">
+        <v-container>
+          <v-card-title>
+            Set selected entry as start, all the previous entries will be deleted.
+          </v-card-title>
+          <v-card-actions>
+            <v-btn @click="modalNexus = false">
+              Cancel
+            </v-btn>
+
+            <v-btn style="margin-left:auto" @click="setStartEntry(); modalNexus = false;">
+              Ok
+            </v-btn>
+          </v-card-actions>
+        </v-container>
+      </v-card>
+
       <!-------  LOGGIN IN CHECK ------->
       <v-card v-if="modalMode === 6">
         <v-container>
@@ -355,8 +426,8 @@
 </template>
 
 <script lang="ts">
-// import EnhancedEntry from "@/components/tlscripteditor/EnhancedEntry.vue";
 import Entrytr from "@/components/tlscripteditor/Entrytr.vue";
+import EnhancedEntry from "@/components/tlscripteditor/EnhancedEntry.vue";
 import { TL_LANGS } from "@/utils/consts";
 import { mdiPlay, mdiStop } from "@mdi/js";
 import { getVideoIDFromUrl } from "@/utils/functions";
@@ -377,7 +448,7 @@ export default {
         };
     },
     components: {
-        // EnhancedEntry,
+        EnhancedEntry,
         Entrytr,
     },
     data() {
@@ -402,6 +473,7 @@ export default {
             profileDisplayTimer: undefined,
             inputString: "",
             tableHeight: 0,
+            selectedEntry: -1,
             // ------ COLOUR -------
             colourPick: 0,
             colourDialogue: false,
@@ -434,6 +506,8 @@ export default {
             timeSaddle: Date.now(),
             refreshRate: 33,
             trackerPause: true,
+            // ---- GRAND CANVAS THINGY ----
+            displayEntry: 0,
         };
     },
     computed: {
@@ -494,6 +568,120 @@ export default {
 
             return timeString;
         },
+        timeStampStart() {
+            let timeRaw = this.entries[this.selectedEntry].Time;
+            let timeString = "";
+
+            let t = Math.floor(timeRaw / 60 / 60 / 1000);
+            timeRaw -= t * 60 * 60 * 1000;
+            if (t < 10) {
+                timeString += `0${t.toString()}`;
+            } else {
+                timeString += t.toString();
+            }
+            timeString += ":";
+
+            t = Math.floor(timeRaw / 60 / 1000);
+            timeRaw -= t * 60 * 1000;
+            if (t < 10) {
+                timeString += `0${t.toString()}`;
+            } else {
+                timeString += t.toString();
+            }
+            timeString += ":";
+
+            t = Math.floor(timeRaw / 1000);
+            timeRaw -= t * 1000;
+            if (t < 10) {
+                timeString += `0${t.toString()}`;
+            } else {
+                timeString += t.toString();
+            }
+            timeString += ".";
+
+            if (timeRaw > 100) {
+                timeString += timeRaw.toString().slice(0, 2);
+            } else if (timeRaw > 10) {
+                timeString += `0${timeRaw.toString().slice(0, 1)}`;
+            } else {
+                timeString += "00";
+            }
+
+            return timeString;
+        },
+        timeStampEnd() {
+            let timeRaw = this.entries[this.selectedEntry].End;
+            let timeString = "";
+
+            let t = Math.floor(timeRaw / 60 / 60 / 1000);
+            timeRaw -= t * 60 * 60 * 1000;
+            if (t < 10) {
+                timeString += `0${t.toString()}`;
+            } else {
+                timeString += t.toString();
+            }
+            timeString += ":";
+
+            t = Math.floor(timeRaw / 60 / 1000);
+            timeRaw -= t * 60 * 1000;
+            if (t < 10) {
+                timeString += `0${t.toString()}`;
+            } else {
+                timeString += t.toString();
+            }
+            timeString += ":";
+
+            t = Math.floor(timeRaw / 1000);
+            timeRaw -= t * 1000;
+            if (t < 10) {
+                timeString += `0${t.toString()}`;
+            } else {
+                timeString += t.toString();
+            }
+            timeString += ".";
+
+            if (timeRaw > 100) {
+                timeString += timeRaw.toString().slice(0, 2);
+            } else if (timeRaw > 10) {
+                timeString += `0${timeRaw.toString().slice(0, 1)}`;
+            } else {
+                timeString += "00";
+            }
+
+            return timeString;
+        },
+        textStyle2() {
+            return {
+                "-webkit-text-fill-color": (!this.profile[this.entries[this.selectedEntry].Profile].useCC) ? "unset" : this.profile[this.entries[this.selectedEntry].Profile].CC,
+                "-webkit-text-stroke-color": (!this.profile[this.entries[this.selectedEntry].Profile].useOC) ? "unset" : this.profile[this.entries[this.selectedEntry].Profile].OC,
+                "-webkit-text-stroke-width": (!this.profile[this.entries[this.selectedEntry].Profile].useOC) ? "0px" : "1px",
+            };
+        },
+        profileListPicker() {
+            const profileList = [];
+            for (let i = 0; i < this.profile.length; i += 1) {
+                profileList.push({
+                    idx: i,
+                    name: this.profile[i].Name,
+                });
+            } return profileList;
+        },
+    },
+    watch: {
+        timerTime() {
+            if (this.entries.length === 0) {
+                this.displayEntry = -1;
+            }
+
+            for (let i = 0; i < this.entries.length; i += 1) {
+                if (this.entries[i].Time > this.timerTime) {
+                    this.displayEntry = i - 1;
+                    return;
+                } if (i === this.entries.length - 1) {
+                    this.displayEntry = i;
+                }
+            }
+        },
     },
     mounted() {
         this.checkLoginValidity();
@@ -541,6 +729,7 @@ export default {
                     }
 
                     this.entries.splice(i, 0, dt);
+                    this.displayEntry = i;
                     inserted = true;
                     this.inputString = "";
                     return;
@@ -552,6 +741,7 @@ export default {
                     this.entries[this.entries.length - 1].End = dt.Time;
                 }
                 this.entries.push(dt);
+                this.displayEntry = this.entries.length - 1;
                 this.inputString = "";
             }
         },
@@ -1300,6 +1490,54 @@ export default {
             });
         },
         //= ======================= LOGIN STATUS CHECK ========================
+
+        //= =----------------------- ENTRY CONTROLLER ------------------------
+        deleteEntry() {
+            const tempEntries = JSON.parse(JSON.stringify(this.entries[this.selectedEntry]));
+            this.displayEntry = -1;
+            this.entries.splice(this.selectedEntry, 1);
+            if (this.selectedEntry === 0) {
+                if (this.entries.length > 0) {
+                    this.entries[0].Time = tempEntries.Time;
+                }
+            } else if (this.selectedEntry < this.entries.length) {
+                this.entries[this.selectedEntry - 1].End = tempEntries.End;
+            }
+
+            this.selectedEntry = -1;
+        },
+        setStartEntry() {
+            this.entries.splice(0, this.selectedEntry);
+            this.selectedEntry = -1;
+            const timeCut = this.entries[0].Time;
+            this.entries = this.entries.map((e) => {
+                e.Time -= timeCut;
+                e.End -= timeCut;
+                return e;
+            });
+        },
+        shiftToCurrentTime() {
+            if (this.selectedEntry >= 0) {
+                const timeTarget = this.timerTime;
+                const timeshift = timeTarget - this.entries[this.selectedEntry].Time;
+
+                for (let i = this.selectedEntry - 1; i >= 0; i -= 1) {
+                    this.entries[i].End = timeTarget - (this.selectedEntry - 1 - i) * 100;
+                    if (this.entries[i].Time > timeTarget) {
+                        this.entries[i].Time = timeTarget - (this.selectedEntry - i) * 100;
+                    } else {
+                        break;
+                    }
+                }
+
+                for (let i = this.selectedEntry; i < this.entries.length; i += 1) {
+                    this.entries[i].End += timeshift;
+                    this.entries[i].Time += timeshift;
+                }
+            }
+            this.selectedEntry = -1;
+        },
+        //= ======================== ENTRY CONTROLLER ========================
     },
 };
 </script>

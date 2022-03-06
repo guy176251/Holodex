@@ -192,6 +192,19 @@
       >
         <v-row class="align-baseline">
           <v-divider />
+          <v-card style="display: flex; flex-direction: column; padding-bottom: 7px; margin-bottom: 5px;">
+            <div style="position: relative;">
+              <div class="Marker" />
+
+              <div ref="TimelineDiv" class="TimelineContainer" :style="{ scrollBehavior: jumpScrollRender }">
+                <div class="TimelineInnerContainer" :style="{ width: 3*secToPx*secPerBar + 'px' }">
+                  <canvas ref="TimeCanvas1" :style="{ height: barHeight + 'px', width: secToPx*secPerBar + 'px'}" />
+                  <canvas ref="TimeCanvas2" :style="{ height: barHeight + 'px', width: secToPx*secPerBar + 'px'}" />
+                  <canvas ref="TimeCanvas3" style="margin-right: auto;" :style="{ height: barHeight + 'px', width: secToPx*secPerBar + 'px'}" />
+                </div>
+              </div>
+            </div>
+          </v-card>
           <v-divider />
         </v-row>
         <v-row class="align-baseline">
@@ -506,8 +519,16 @@ export default {
             timeSaddle: Date.now(),
             refreshRate: 33,
             trackerPause: true,
-            // ---- GRAND CANVAS THINGY ----
+            // ---- TIMELINE ----
+            timelineDur: 3600,
+            secToPx: 100,
+            secPerBar: 120,
+            barHeight: 25,
+            extraMargin: 0,
+            jumpScroll: true,
+            barCount: 0,
             displayEntry: 0,
+
         };
     },
     computed: {
@@ -666,6 +687,9 @@ export default {
                 });
             } return profileList;
         },
+        jumpScrollRender() {
+            return (this.jumpScroll ? "unset" : "smooth");
+        },
     },
     watch: {
         timerTime() {
@@ -685,6 +709,7 @@ export default {
     },
     mounted() {
         this.checkLoginValidity();
+        this.rerenderTimeline();
     },
     created() {
         window.addEventListener("resize", this.onResize);
@@ -1538,7 +1563,145 @@ export default {
             this.selectedEntry = -1;
         },
         //= ======================== ENTRY CONTROLLER ========================
+
+        //= ------------------------ TIMELINE CONTROLLER ------------------------
+        rerenderTimeline() {
+            if (this.$refs.TimeCanvas1) {
+                let ctx: CanvasRenderingContext2D | null = null;
+                for (let i = 0; i < 3; i += 1) {
+                    switch (i) {
+                        case 0:
+                            ctx = this.$refs.TimeCanvas1.getContext("2d");
+                            this.$refs.TimeCanvas1.width = this.secToPx * this.secPerBar;
+                            this.$refs.TimeCanvas1.height = this.barHeight;
+                            break;
+
+                        case 1:
+                            ctx = this.$refs.TimeCanvas2.getContext("2d");
+                            this.$refs.TimeCanvas2.width = this.secToPx * this.secPerBar;
+                            this.$refs.TimeCanvas2.height = this.barHeight;
+                            break;
+
+                        case 2:
+                            ctx = this.$refs.TimeCanvas3.getContext("2d");
+                            this.$refs.TimeCanvas3.width = this.secToPx * this.secPerBar;
+                            this.$refs.TimeCanvas3.height = this.barHeight;
+                            break;
+
+                        default:
+                            ctx = null;
+                            break;
+                    }
+
+                    if (ctx) {
+                        ctx.save();
+                        ctx.strokeStyle = "white";
+                        ctx.fillStyle = "white";
+                        ctx.font = "14px Ubuntu";
+                        ctx.lineWidth = 0.35;
+
+                        if (this.secToPx <= 60) {
+                            for (let x = 0; x / 10 < this.secPerBar; x += 10) {
+                                ctx.beginPath();
+                                ctx.moveTo((x * this.secToPx) / 10, 0);
+                                ctx.lineTo((x * this.secToPx) / 10, this.barHeight);
+                                ctx.stroke();
+
+                                ctx.fillText(this.secToTimestring(x / 10 + i * this.secPerBar + this.barCount * this.secPerBar, false, false), (x * this.secToPx) / 10 + 5, this.barHeight);
+                            }
+
+                            ctx.restore();
+                        } else if (this.secToPx <= 100) {
+                            for (let x = 0; x / 10 < this.secPerBar; x += 2) {
+                                if (x % 10 === 0) {
+                                    ctx.beginPath();
+                                    ctx.moveTo((x * this.secToPx) / 10, 0);
+                                    ctx.lineTo((x * this.secToPx) / 10, this.barHeight);
+                                    ctx.stroke();
+
+                                    ctx.fillText(this.secToTimestring(x / 10 + i * this.secPerBar + this.barCount * this.secPerBar, false, false), (x * this.secToPx) / 10 + 5, this.barHeight);
+                                } else {
+                                    ctx.beginPath();
+                                    ctx.moveTo((x * this.secToPx) / 10, 0);
+                                    ctx.lineTo((x * this.secToPx) / 10, (this.barHeight * 2.0) / 3.0);
+                                    ctx.stroke();
+                                }
+                            }
+
+                            ctx.restore();
+                        } else {
+                            for (let x = 0; x / 10 < this.secPerBar; x += 1) {
+                                if (x % 10 === 0) {
+                                    ctx.beginPath();
+                                    ctx.moveTo((x * this.secToPx) / 10, 0);
+                                    ctx.lineTo((x * this.secToPx) / 10, this.barHeight);
+                                    ctx.stroke();
+
+                                    ctx.fillText(this.secToTimestring(x / 10 + i * this.secPerBar + this.barCount * this.secPerBar, false, false), (x * this.secToPx) / 10 + 5, this.barHeight);
+                                } else if (x % 2 === 0) {
+                                    ctx.beginPath();
+                                    ctx.moveTo((x * this.secToPx) / 10, 0);
+                                    ctx.lineTo((x * this.secToPx) / 10, (this.barHeight * 2.0) / 3.0);
+                                    ctx.stroke();
+                                } else {
+                                    ctx.beginPath();
+                                    ctx.moveTo((x * this.secToPx) / 10, 0);
+                                    ctx.lineTo((x * this.secToPx) / 10, (this.barHeight * 2.0) / 3.0);
+                                    ctx.stroke();
+                                }
+                            }
+
+                            ctx.restore();
+                        }
+                    }
+                }
+            }
+        },
+        secToTimestring(secInput: number, msOutput: boolean = true, Full: boolean = false): string {
+            let Sec = secInput;
+            let MS:string = Math.floor((Sec % 1) * 100).toString();
+            if (MS.length === 1) {
+                MS = `0${MS}`;
+            }
+
+            Sec = Math.floor(Sec);
+            const H: number = Math.floor(Sec / 60 / 60);
+            Sec -= H * 60 * 60;
+            const M: number = Math.floor(Sec / 60);
+            Sec -= M * 60;
+
+            let Stemp:string = H.toString();
+            if (Stemp.length === 1) {
+                Stemp = `0${Stemp}`;
+            }
+            Stemp = `${Stemp}:${(`0${M.toString()}`).slice(-2)}:${(`0${Sec.toString()}`).slice(-2)}.${MS}`;
+
+            if (Full) {
+                if (msOutput) {
+                    return Stemp;
+                }
+                return Stemp.slice(0, Stemp.length - 3);
+            }
+            for (let i = 0; i < 3; i += 1) {
+                if (Stemp.slice(0, 2) !== "00") {
+                    break;
+                } else {
+                    Stemp = Stemp.slice(3);
+                }
+            }
+
+            if (Stemp[0] === "0") {
+                Stemp = Stemp.slice(1);
+            }
+
+            if (msOutput) {
+                return Stemp;
+            }
+            return Stemp.slice(0, Stemp.length - 3);
+        },
+        //= ======================== TIMELINE CONTROLLER ========================
     },
+
 };
 </script>
 
@@ -1568,5 +1731,28 @@ export default {
   top: 5px;
   right: 5px;
   z-index: 1;
+}
+.Marker {
+  position: absolute;
+  left: calc(40% - 2px);
+  top: 0px;
+  width: 4px;
+  height: 100%;
+  z-index: 1;
+  background-color: rgba(255, 0, 0, 0.7);
+}
+.TimelineContainer {
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  border-top: 2px solid white;
+  padding-top: 7px;
+  border-bottom: 2px solid white;
+}
+.TimelineInnerContainer {
+  display: flex;
+  flex-direction: row;
+  margin-left: 40%;
+  margin-bottom: 10px;
 }
 </style>

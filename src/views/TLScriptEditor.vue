@@ -202,6 +202,21 @@
                   <canvas ref="TimeCanvas2" :style="{ height: barHeight + 'px', width: secToPx*secPerBar + 'px'}" />
                   <canvas ref="TimeCanvas3" style="margin-right: auto;" :style="{ height: barHeight + 'px', width: secToPx*secPerBar + 'px'}" />
                 </div>
+
+                <div class="TimecardContainer" :style="{ 'margin-left': 'calc(40% + 3px + ' + extraMargin + 'px)', width: 3*secToPx*secPerBar + 'px'}">
+                  <div
+                    v-for="(idx) in timecardIdx"
+                    :key="idx"
+                    class="Timecard"
+                    :style="{ fontsize: fontSize + 'px', width: cardWidthCalculator(idx)}"
+                  >
+                    <EnhancedEntry
+                      :stext="entries[idx].SText"
+                      :cc="profile[entries[idx].Profile].useCC ? profile[entries[idx].Profile].CC : ''"
+                      :oc="profile[entries[idx].Profile].useOC ? profile[entries[idx].Profile].OC : ''"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </v-card>
@@ -487,6 +502,7 @@ export default {
             inputString: "",
             tableHeight: 0,
             selectedEntry: -1,
+            fontSize: 15,
             // ------ COLOUR -------
             colourPick: 0,
             colourDialogue: false,
@@ -528,6 +544,7 @@ export default {
             jumpScroll: true,
             barCount: 0,
             displayEntry: 0,
+            timecardIdx: [],
 
         };
     },
@@ -693,16 +710,41 @@ export default {
     },
     watch: {
         timerTime() {
+            this.scrollCalculator();
             if (this.entries.length === 0) {
                 this.displayEntry = -1;
+                return;
             }
 
-            for (let i = 0; i < this.entries.length; i += 1) {
-                if (this.entries[i].Time > this.timerTime) {
-                    this.displayEntry = i - 1;
-                    return;
-                } if (i === this.entries.length - 1) {
-                    this.displayEntry = i;
+            if (this.displayEntry < 0) {
+                for (let i = 0; i < this.entries.length; i += 1) {
+                    if (this.entries[i].Time > this.timerTime) {
+                        this.displayEntry = i - 1;
+                        return;
+                    } if (i === this.entries.length - 1) {
+                        this.displayEntry = i;
+                        return;
+                    }
+                }
+            } else if (this.entries[this.displayEntry].Time > this.timerTime) {
+                for (let i = this.displayEntry - 1; i > 0; i -= 1) {
+                    if (this.entries[i].End > this.timerTime) {
+                        this.displayEntry = i;
+                        return;
+                    } if (i >= this.entries.length) {
+                        this.displayEntry = 0;
+                        return;
+                    }
+                }
+            } else if (this.entries[this.displayEntry].End < this.timerTime) {
+                for (let i = this.displayEntry + 1; i < this.entries.length; i += 1) {
+                    if (this.entries[i].Time > this.timerTime) {
+                        this.displayEntry = i - 1;
+                        return;
+                    } if (i === this.entries.length - 1) {
+                        this.displayEntry = i;
+                        return;
+                    }
                 }
             }
         },
@@ -768,6 +810,7 @@ export default {
                 this.entries.push(dt);
                 this.displayEntry = this.entries.length - 1;
                 this.inputString = "";
+                this.reloadDisplayCards();
             }
         },
         deleteAuxLink(idx: number) {
@@ -1699,6 +1742,159 @@ export default {
             }
             return Stemp.slice(0, Stemp.length - 3);
         },
+        scrollCalculator(): void {
+            const deltaBar: number = this.timerTime / 1000 / this.secPerBar - this.barCount;
+            if ((deltaBar > 3) || (deltaBar < 0)) {
+                const barCountNew = Math.floor(this.timerTime / 1000 / this.secPerBar);
+                if (barCountNew > 0) {
+                    this.barCount = barCountNew - 1;
+                } else {
+                    this.barCount = 0;
+                }
+                this.rerenderTimeline();
+                this.reloadDisplayCards();
+            } else if (deltaBar > 2) {
+                this.barCount += 1;
+                this.renderForward();
+                this.reloadDisplayCards();
+            } else if ((deltaBar < 1) && (this.barCount > 0)) {
+                this.barCount -= 1;
+                this.renderBackward();
+                this.reloadDisplayCards();
+            }
+
+            this.$refs.TimelineDiv.scrollLeft = (this.timerTime / 1000 - this.barCount * this.secPerBar) * this.secToPx;
+        },
+        renderForward(): void {
+            let ctx = this.$refs.TimeCanvas1.getContext("2d");
+            if (ctx) {
+                this.$refs.TimeCanvas1.width = this.secToPx * this.secPerBar;
+                this.$refs.TimeCanvas1.height = this.barHeight;
+                ctx.drawImage(this.$refs.TimeCanvas2, 0, 0);
+            }
+
+            ctx = this.$refs.TimeCanvas2.getContext("2d");
+            if (ctx) {
+                this.$refs.TimeCanvas2.width = this.secToPx * this.secPerBar;
+                this.$refs.TimeCanvas2.height = this.barHeight;
+                ctx.drawImage(this.$refs.TimeCanvas3, 0, 0);
+            }
+
+            ctx = this.$refs.TimeCanvas3.getContext("2d");
+            this.$refs.TimeCanvas3.width = this.secToPx * this.secPerBar;
+            this.$refs.TimeCanvas3.height = this.barHeight;
+
+            if (ctx) {
+                ctx.save();
+                ctx.strokeStyle = "white";
+                ctx.fillStyle = "white";
+                ctx.font = "14px Ubuntu";
+                ctx.lineWidth = 0.35;
+
+                for (let x = 0; x / 10 < this.secPerBar; x += 1) {
+                    if (x % 10 === 0) {
+                        ctx.beginPath();
+                        ctx.moveTo((x * this.secToPx) / 10, 0);
+                        ctx.lineTo((x * this.secToPx) / 10, this.barHeight);
+                        ctx.stroke();
+
+                        ctx.fillText(this.SectoTimestring(x / 10 + 2 * this.secPerBar + this.barCount * this.secPerBar, false, false), (x * this.secToPx) / 10 + 5, this.barHeight);
+                    } else if (x % 2 === 0) {
+                        ctx.beginPath();
+                        ctx.moveTo((x * this.secToPx) / 10, 0);
+                        ctx.lineTo((x * this.secToPx) / 10, (this.barHeight * 2.0) / 3.0);
+                        ctx.stroke();
+                    } else {
+                        ctx.beginPath();
+                        ctx.moveTo((x * this.secToPx) / 10, 0);
+                        ctx.lineTo((x * this.secToPx) / 10, (this.barHeight * 1.0) / 3.0);
+                        ctx.stroke();
+                    }
+                }
+
+                ctx.restore();
+            }
+        },
+        renderBackward(): void {
+            let ctx = this.$refs.TimeCanvas3.getContext("2d");
+            if (ctx) {
+                this.$refs.TimeCanvas3.width = this.secToPx * this.secPerBar;
+                this.$refs.TimeCanvas3.height = this.barHeight;
+                ctx.drawImage(this.$refs.TimeCanvas2, 0, 0);
+            }
+
+            ctx = this.$refs.TimeCanvas2.getContext("2d");
+            if (ctx) {
+                this.$refs.TimeCanvas2.width = this.secToPx * this.secPerBar;
+                this.$refs.TimeCanvas2.height = this.barHeight;
+                ctx.drawImage(this.$refs.TimeCanvas1, 0, 0);
+            }
+
+            ctx = this.$refs.TimeCanvas1.getContext("2d");
+            this.$refs.TimeCanvas1.width = this.secToPx * this.secPerBar;
+            this.$refs.TimeCanvas1.height = this.barHeight;
+
+            if (ctx) {
+                ctx.save();
+                ctx.strokeStyle = "white";
+                ctx.fillStyle = "white";
+                ctx.font = "14px Ubuntu";
+                ctx.lineWidth = 0.35;
+
+                for (let x = 0; x / 10 < this.secPerBar; x += 1) {
+                    if (x % 10 === 0) {
+                        ctx.beginPath();
+                        ctx.moveTo((x * this.secToPx) / 10, 0);
+                        ctx.lineTo((x * this.secToPx) / 10, this.barHeight);
+                        ctx.stroke();
+
+                        ctx.fillText(this.SectoTimestring(x / 10 + this.barCount * this.secPerBar, false, false), (x * this.secToPx) / 10 + 5, this.barHeight);
+                    } else if (x % 2 === 0) {
+                        ctx.beginPath();
+                        ctx.moveTo((x * this.secToPx) / 10, 0);
+                        ctx.lineTo((x * this.secToPx) / 10, (this.barHeight * 2.0) / 3.0);
+                        ctx.stroke();
+                    } else {
+                        ctx.beginPath();
+                        ctx.moveTo((x * this.secToPx) / 10, 0);
+                        ctx.lineTo((x * this.secToPx) / 10, (this.barHeight * 1.0) / 3.0);
+                        ctx.stroke();
+                    }
+                }
+
+                ctx.restore();
+            }
+        },
+        reloadDisplayCards():void {
+            this.timecardIdx = [];
+            this.extraMargin = 0;
+            for (let i = 0; i < this.entries.length; i += 1) {
+                if (this.entries[i].End > (this.barCount + 3.0) * this.secPerBar * 1000) {
+                    if (this.entries[i].Time < (this.barCount + 3.0) * this.secPerBar * 1000) {
+                        this.timecardIdx.push(i);
+                    }
+                    break;
+                } else if (this.entries[i].End > this.barCount * this.secPerBar * 1000) {
+                    if (this.entries[i].Time >= this.barCount * this.secPerBar * 1000) {
+                        this.timecardIdx.push(i);
+
+                        if ((i === 0) && (this.entries[i].Time !== 0)) {
+                            this.extraMargin = (this.entries[i].Time / 1000 - this.barCount * this.secPerBar) * this.secToPx;
+                        }
+                    } else {
+                        this.timecardIdx.push(i);
+                    }
+                }
+            }
+        },
+        cardWidthCalculator(idx: number): string {
+            if ((idx !== 0) && (idx === this.timecardIdx[0])) {
+                return (`${((this.entries[idx].End / 1000 - this.barCount * this.secPerBar) * this.secToPx).toString()}px`);
+            } if (this.entries[idx].End > (this.barCount + 3.0) * this.secPerBar * 1000) {
+                return (`${(((this.barCount + 3.0) * this.secPerBar - this.entries[idx].Time / 1000) * this.secToPx).toString()}px`);
+            }
+            return (`${(((this.entries[idx].End - this.entries[idx].Time) / 1000) * this.secToPx).toString()}px`);
+        },
         //= ======================== TIMELINE CONTROLLER ========================
     },
 
@@ -1754,5 +1950,20 @@ export default {
   flex-direction: row;
   margin-left: 40%;
   margin-bottom: 10px;
+}
+.TimecardContainer {
+  display: flex;
+  flex-direction: row;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+.Timecard {
+  display: flex;
+  flex-direction: row;
+  -webkit-text-stroke-width: 1px;
+  align-items: center;
+  font-family: Ubuntu;
+  font-weight: bolder;
+  border: solid 1px white;
 }
 </style>

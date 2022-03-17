@@ -4,7 +4,7 @@
     <td>{{ timeStampEnd }}</td>
     <td>{{ profileName }}</td>
     <td class="EntryContainer" :style="textStyle" colspan="2">
-      <span>
+      <span style="word-wrap:break-word">
         {{ stext }}
       </span>
     </td>

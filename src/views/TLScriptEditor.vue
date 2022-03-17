@@ -193,32 +193,44 @@
         <v-row class="align-baseline">
           <v-divider />
           <v-card style="display: flex; flex-direction: column; padding-bottom: 7px; margin-bottom: 5px;">
-            <div style="position: relative;">
+            <v-card style="position: relative;">
               <div class="Marker" />
 
               <div ref="TimelineDiv" class="TimelineContainer" :style="{ scrollBehavior: jumpScrollRender }">
-                <div class="TimelineInnerContainer" :style="{ width: 3*secToPx*secPerBar + 'px' }">
+                <v-card class="TimelineInnerContainer" :style="{ width: 3*secToPx*secPerBar + 'px' }">
                   <canvas ref="TimeCanvas1" :style="{ height: barHeight + 'px', width: secToPx*secPerBar + 'px'}" />
                   <canvas ref="TimeCanvas2" :style="{ height: barHeight + 'px', width: secToPx*secPerBar + 'px'}" />
                   <canvas ref="TimeCanvas3" style="margin-right: auto;" :style="{ height: barHeight + 'px', width: secToPx*secPerBar + 'px'}" />
-                </div>
+                </v-card>
 
-                <div class="TimecardContainer" :style="{ 'margin-left': 'calc(40% + 3px + ' + extraMargin + 'px)', width: 3*secToPx*secPerBar + 'px'}">
-                  <div
+                <div
+                  class="d-flex flex-row"
+                  :style="{ 'margin-left': 'calc(40% + ' + extraMargin + 'px)', width: 3*secToPx*secPerBar + 'px'}"
+                  @mouseleave="rulerMouseLeave()"
+                  @mouseup="rulerMouseUp()"
+                  @mousemove="rulerMouseMove($event)"
+                >
+                  <v-card
                     v-for="(idx) in timecardIdx"
                     :key="idx"
-                    class="Timecard"
+                    class="d-flex flex-row align-center rounded-lg Timecard"
+                    elevation="2"
+                    outlined
                     :style="{ fontsize: fontSize + 'px', width: cardWidthCalculator(idx)}"
                   >
+                    <div style="width: 3px; background-color: transparent; height: 100%; cursor: ew-resize;" @mousedown="rulerMouseDown($event, idx - 1, true);" />
                     <EnhancedEntry
                       :stext="entries[idx].SText"
                       :cc="profile[entries[idx].Profile].useCC ? profile[entries[idx].Profile].CC : ''"
                       :oc="profile[entries[idx].Profile].useOC ? profile[entries[idx].Profile].OC : ''"
+                      class="TimecardText"
+                      @mousedown.native="rulerMouseDown($event, idx, false)"
                     />
-                  </div>
+                    <div style="width: 3px; background-color: transparent; height: 100%; cursor: ew-resize;" @mousedown="rulerMouseDown($event, idx, true);" />
+                  </v-card>
                 </div>
               </div>
-            </div>
+            </v-card>
           </v-card>
           <v-divider />
         </v-row>
@@ -545,7 +557,9 @@ export default {
             barCount: 0,
             displayEntry: 0,
             timecardIdx: [],
-
+            timelineActive: false,
+            resizeMode: false,
+            xPos: 0,
         };
     },
     computed: {
@@ -799,6 +813,7 @@ export default {
                     this.displayEntry = i;
                     inserted = true;
                     this.inputString = "";
+                    this.reloadDisplayCards();
                     return;
                 }
             }
@@ -868,7 +883,7 @@ export default {
                         this.timerTime += Date.now() - this.timeSaddle;
                     }
                     this.timeSaddle = Date.now();
-                // this.ScrollCalculator();
+                    this.scrollCalculator();
                 }, this.refreshRate);
             }
         },
@@ -1398,7 +1413,7 @@ export default {
             }
             this.timerDelegate = setInterval(() => {
                 this.timerTime = this.player.getCurrentTime() * 1000;
-            // this.ScrollCalculator();
+                this.scrollCalculator();
             }, 100);
         },
         //= ================  YT  =================
@@ -1469,7 +1484,7 @@ export default {
                     this.timerTime += Date.now() - this.timeSaddle;
                 }
                 this.timeSaddle = Date.now();
-                // this.ScrollCalculator();
+                this.scrollCalculator();
             }, this.refreshRate);
         },
         //= ================  TW  =================
@@ -1563,6 +1578,7 @@ export default {
         deleteEntry() {
             const tempEntries = JSON.parse(JSON.stringify(this.entries[this.selectedEntry]));
             this.displayEntry = -1;
+            this.timecardIdx = [];
             this.entries.splice(this.selectedEntry, 1);
             if (this.selectedEntry === 0) {
                 if (this.entries.length > 0) {
@@ -1571,10 +1587,12 @@ export default {
             } else if (this.selectedEntry < this.entries.length) {
                 this.entries[this.selectedEntry - 1].End = tempEntries.End;
             }
-
+            this.reloadDisplayCards();
             this.selectedEntry = -1;
         },
         setStartEntry() {
+            this.timecardIdx = [];
+            this.displayEntry = -1;
             this.entries.splice(0, this.selectedEntry);
             this.selectedEntry = -1;
             const timeCut = this.entries[0].Time;
@@ -1583,6 +1601,7 @@ export default {
                 e.End -= timeCut;
                 return e;
             });
+            this.reloadDisplayCards();
         },
         shiftToCurrentTime() {
             if (this.selectedEntry >= 0) {
@@ -1895,6 +1914,92 @@ export default {
             }
             return (`${(((this.entries[idx].End - this.entries[idx].Time) / 1000) * this.secToPx).toString()}px`);
         },
+        rulerMouseLeave() {
+            this.timelineActive = false;
+        },
+        rulerMouseDown(event: any, idx: number, resizeSwitch: boolean) {
+            if (idx < 0) {
+                this.selectedEntry = 0;
+                this.timelineActive = true;
+                this.xPos = event.clientX;
+                this.resizeMode = false;
+                return;
+            }
+            if (!this.timelineActive) {
+                this.selectedEntry = idx;
+                this.timelineActive = true;
+                this.xPos = event.clientX;
+                this.resizeMode = resizeSwitch;
+            }
+        },
+        rulerMouseUp() {
+            this.timelineActive = false;
+        },
+        rulerMouseMove(event: any) {
+            if (this.timelineActive) {
+                if (this.resizeMode) {
+                    const a = this.entries[this.selectedEntry].End + ((event.clientX - this.xPos) / this.secToPx) * 1000;
+                    if (a - this.entries[this.selectedEntry].Time < 50) {
+                        this.timelineActive = false;
+                        return;
+                    }
+
+                    if (this.selectedEntry < this.entries.length - 1) {
+                        const b = this.entries[this.selectedEntry + 1].Time + ((event.clientX - this.xPos) / this.secToPx) * 1000;
+                        if (this.entries[this.selectedEntry + 1].End - b < 50) {
+                            this.timelineActive = false;
+                            return;
+                        }
+                        this.entries[this.selectedEntry + 1].Time = b;
+                    }
+                    this.entries[this.selectedEntry].End = a;
+                } else if (this.selectedEntry !== 0) {
+                    const a = this.entries[this.selectedEntry - 1].End + ((event.clientX - this.xPos) / this.secToPx) * 1000;
+                    if (a - this.entries[this.selectedEntry - 1].Time < 50) {
+                        this.timelineActive = false;
+                        return;
+                    }
+
+                    if (this.selectedEntry < this.entries.length - 1) {
+                        const b = this.entries[this.selectedEntry + 1].Time + ((event.clientX - this.xPos) / this.secToPx) * 1000;
+                        if (this.entries[this.selectedEntry + 1].End - b < 50) {
+                            this.timelineActive = false;
+                            return;
+                        }
+                        this.entries[this.selectedEntry + 1].Time = b;
+                    }
+
+                    this.entries[this.selectedEntry - 1].End = a;
+                    this.entries[this.selectedEntry].Time += ((event.clientX - this.xPos) / this.secToPx) * 1000;
+                    this.entries[this.selectedEntry].End += ((event.clientX - this.xPos) / this.secToPx) * 1000;
+                } else {
+                    const a = this.entries[this.selectedEntry].Time + ((event.clientX - this.xPos) / this.secToPx) * 1000;
+                    if (a < 0) {
+                        this.timelineActive = false;
+                        return;
+                    }
+
+                    if (this.selectedEntry < this.entries.length - 1) {
+                        const b = this.entries[this.selectedEntry + 1].Time + ((event.clientX - this.xPos) / this.secToPx) * 1000;
+                        if (this.entries[this.selectedEntry + 1].End - b < 50) {
+                            this.timelineActive = false;
+                            return;
+                        }
+                        this.entries[this.selectedEntry + 1].Time = b;
+                    }
+
+                    if (this.entries[this.selectedEntry].End - a < 50) {
+                        this.timelineActive = false;
+                        return;
+                    }
+
+                    this.entries[this.selectedEntry].Time = a;
+                    this.entries[this.selectedEntry].End += ((event.clientX - this.xPos) / this.secToPx) * 1000;
+                    this.reloadDisplayCards();
+                }
+                this.xPos = event.clientX;
+            }
+        },
         //= ======================== TIMELINE CONTROLLER ========================
     },
 
@@ -1945,25 +2050,18 @@ export default {
   padding-top: 7px;
   border-bottom: 2px solid white;
 }
-.TimelineInnerContainer {
+.TimelineInnerContainer.v-sheet.v-card {
   display: flex;
   flex-direction: row;
   margin-left: 40%;
   margin-bottom: 10px;
 }
-.TimecardContainer {
-  display: flex;
-  flex-direction: row;
-  margin-top: 5px;
-  margin-bottom: 5px;
+.Timecard.v-sheet.v-card{
+  border: 2px solid white;
 }
-.Timecard {
-  display: flex;
-  flex-direction: row;
-  -webkit-text-stroke-width: 1px;
-  align-items: center;
-  font-family: Ubuntu;
-  font-weight: bolder;
-  border: solid 1px white;
+.TimecardText {
+  width:100%;
+  cursor:grab;
+  max-height: 3em;
 }
 </style>

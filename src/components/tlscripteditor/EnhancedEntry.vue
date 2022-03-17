@@ -38,5 +38,6 @@ export default {
     font-weight: bold;
     text-align: center;
     margin: 2px 4px 2px 4px;
+    word-wrap: break-word;
 }
 </style>

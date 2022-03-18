@@ -81,7 +81,7 @@
                   v-if="selectedEntry !== index"
                   :key="index"
                   :time="entry.Time"
-                  :end="entry.End"
+                  :duration="entry.Duration"
                   :stext="entry.SText"
                   :profile-name="profile[entry.Profile].Name"
                   :cc="profile[entry.Profile].useCC ? profile[entry.Profile].CC : ''"
@@ -205,29 +205,32 @@
 
                 <div
                   class="d-flex flex-row"
-                  :style="{ 'margin-left': 'calc(40% + ' + extraMargin + 'px)', width: 3*secToPx*secPerBar + 'px'}"
+                  style="margin-left: 40%"
+                  :style="{ width: 3*secToPx*secPerBar + 'px'}"
                   @mouseleave="rulerMouseLeave()"
                   @mouseup="rulerMouseUp()"
                   @mousemove="rulerMouseMove($event)"
                 >
-                  <v-card
-                    v-for="(idx) in timecardIdx"
-                    :key="idx"
-                    class="d-flex flex-row align-center rounded-lg Timecard"
-                    elevation="2"
-                    outlined
-                    :style="{ fontsize: fontSize + 'px', width: cardWidthCalculator(idx)}"
-                  >
-                    <div style="width: 3px; background-color: transparent; height: 100%; cursor: ew-resize;" @mousedown="rulerMouseDown($event, idx - 1, true);" />
-                    <EnhancedEntry
-                      :stext="entries[idx].SText"
-                      :cc="profile[entries[idx].Profile].useCC ? profile[entries[idx].Profile].CC : ''"
-                      :oc="profile[entries[idx].Profile].useOC ? profile[entries[idx].Profile].OC : ''"
-                      class="TimecardText"
-                      @mousedown.native="rulerMouseDown($event, idx, false)"
-                    />
-                    <div style="width: 3px; background-color: transparent; height: 100%; cursor: ew-resize;" @mousedown="rulerMouseDown($event, idx, true);" />
-                  </v-card>
+                  <template v-for="(idx, index) in timecardIdx">
+                    <div :key="idx + 'frontdiv'" :style="{width: cardFiller(index) + 'px'}" />
+                    <v-card
+                      :key="idx + 'card'"
+                      class="d-flex flex-row align-center rounded-lg Timecard"
+                      elevation="2"
+                      outlined
+                      :style="{ fontsize: fontSize + 'px', width: entries[idx].Duration/1000*secToPx + 'px'}"
+                    >
+                      <div style="width: 3px; background-color: transparent; height: 100%; cursor: ew-resize;" @mousedown="rulerMouseDown($event, idx, 0);" />
+                      <EnhancedEntry
+                        :stext="entries[idx].SText"
+                        :cc="profile[entries[idx].Profile].useCC ? profile[entries[idx].Profile].CC : ''"
+                        :oc="profile[entries[idx].Profile].useOC ? profile[entries[idx].Profile].OC : ''"
+                        class="TimecardText"
+                        @mousedown.native="rulerMouseDown($event, idx, 1)"
+                      />
+                      <div style="width: 3px; background-color: transparent; height: 100%; cursor: ew-resize;" @mousedown="rulerMouseDown($event, idx, 2);" />
+                    </v-card>
+                  </template>
                 </div>
               </div>
             </v-card>
@@ -552,7 +555,6 @@ export default {
             secToPx: 100,
             secPerBar: 120,
             barHeight: 25,
-            extraMargin: 0,
             jumpScroll: true,
             barCount: 0,
             displayEntry: 0,
@@ -662,7 +664,7 @@ export default {
             return timeString;
         },
         timeStampEnd() {
-            let timeRaw = this.entries[this.selectedEntry].End;
+            let timeRaw = this.entries[this.selectedEntry].Time + this.entries[this.selectedEntry].Duration;
             let timeString = "";
 
             let t = Math.floor(timeRaw / 60 / 60 / 1000);
@@ -742,7 +744,7 @@ export default {
                 }
             } else if (this.entries[this.displayEntry].Time > this.timerTime) {
                 for (let i = this.displayEntry - 1; i > 0; i -= 1) {
-                    if (this.entries[i].End > this.timerTime) {
+                    if (this.entries[i].Time + this.entries[i].Duration > this.timerTime) {
                         this.displayEntry = i;
                         return;
                     } if (i >= this.entries.length) {
@@ -750,7 +752,7 @@ export default {
                         return;
                     }
                 }
-            } else if (this.entries[this.displayEntry].End < this.timerTime) {
+            } else if (this.entries[this.displayEntry].Time + this.entries[this.displayEntry].Duration < this.timerTime) {
                 for (let i = this.displayEntry + 1; i < this.entries.length; i += 1) {
                     if (this.entries[i].Time > this.timerTime) {
                         this.displayEntry = i - 1;
@@ -793,7 +795,7 @@ export default {
         addEntry() {
             const dt = {
                 Time: this.timerTime,
-                End: this.timerTime + 3000,
+                Duration: 3000,
                 SText: this.profile[this.profileIdx].Prefix + this.inputString + this.profile[this.profileIdx].Suffix,
                 Profile: this.profileIdx,
             };
@@ -802,11 +804,11 @@ export default {
             for (let i = 0; i < this.entries.length; i += 1) {
                 if (this.entries[i].Time > dt.Time) {
                     if (i > 0) {
-                        this.entries[i - 1].End = dt.Time;
+                        this.entries[i - 1].Duration = dt.Time - this.entries[i - 1].Time;
                     }
 
                     if (i < this.entries.length) {
-                        dt.End = this.entries[i].Time;
+                        dt.Duration = this.entries[i].Time - dt.Time;
                     }
 
                     this.entries.splice(i, 0, dt);
@@ -820,7 +822,7 @@ export default {
 
             if (!inserted) {
                 if (this.entries.length !== 0) {
-                    this.entries[this.entries.length - 1].End = dt.Time;
+                    this.entries[this.entries.length - 1].Duration = dt.Time - this.entries[this.entries.length - 1].Time;
                 }
                 this.entries.push(dt);
                 this.displayEntry = this.entries.length - 1;
@@ -1585,7 +1587,7 @@ export default {
                     this.entries[0].Time = tempEntries.Time;
                 }
             } else if (this.selectedEntry < this.entries.length) {
-                this.entries[this.selectedEntry - 1].End = tempEntries.End;
+                this.entries[this.selectedEntry - 1].Duration = tempEntries.Time + tempEntries.Duration - this.entries[this.selectedEntry - 1].Time;
             }
             this.reloadDisplayCards();
             this.selectedEntry = -1;
@@ -1598,7 +1600,6 @@ export default {
             const timeCut = this.entries[0].Time;
             this.entries = this.entries.map((e) => {
                 e.Time -= timeCut;
-                e.End -= timeCut;
                 return e;
             });
             this.reloadDisplayCards();
@@ -1609,7 +1610,7 @@ export default {
                 const timeshift = timeTarget - this.entries[this.selectedEntry].Time;
 
                 for (let i = this.selectedEntry - 1; i >= 0; i -= 1) {
-                    this.entries[i].End = timeTarget - (this.selectedEntry - 1 - i) * 100;
+                    this.entries[i].Duration = timeTarget - (this.selectedEntry - 1 - i) * 100 - this.entries[i].Time;
                     if (this.entries[i].Time > timeTarget) {
                         this.entries[i].Time = timeTarget - (this.selectedEntry - i) * 100;
                     } else {
@@ -1618,7 +1619,6 @@ export default {
                 }
 
                 for (let i = this.selectedEntry; i < this.entries.length; i += 1) {
-                    this.entries[i].End += timeshift;
                     this.entries[i].Time += timeshift;
                 }
             }
@@ -1718,6 +1718,12 @@ export default {
                     }
                 }
             }
+        },
+        cardFiller(index) {
+            if (index === 0) {
+                return ((this.entries[this.timecardIdx[index]].Time / 1000 - this.secPerBar * this.barCount) * this.secToPx);
+            }
+            return (((this.entries[this.timecardIdx[index]].Time - this.entries[this.timecardIdx[index - 1]].Time - this.entries[this.timecardIdx[index - 1]].Duration) / 1000) * this.secToPx);
         },
         secToTimestring(secInput: number, msOutput: boolean = true, Full: boolean = false): string {
             let Sec = secInput;
@@ -1886,45 +1892,25 @@ export default {
         },
         reloadDisplayCards():void {
             this.timecardIdx = [];
-            this.extraMargin = 0;
             for (let i = 0; i < this.entries.length; i += 1) {
-                if (this.entries[i].End > (this.barCount + 3.0) * this.secPerBar * 1000) {
+                if (this.entries[i].Time + this.entries[i].Duration > (this.barCount + 3.0) * this.secPerBar * 1000) {
                     if (this.entries[i].Time < (this.barCount + 3.0) * this.secPerBar * 1000) {
                         this.timecardIdx.push(i);
                     }
                     break;
-                } else if (this.entries[i].End > this.barCount * this.secPerBar * 1000) {
+                } else if (this.entries[i].Time + this.entries[i].Duration > this.barCount * this.secPerBar * 1000) {
                     if (this.entries[i].Time >= this.barCount * this.secPerBar * 1000) {
                         this.timecardIdx.push(i);
-
-                        if ((i === 0) && (this.entries[i].Time !== 0)) {
-                            this.extraMargin = (this.entries[i].Time / 1000 - this.barCount * this.secPerBar) * this.secToPx;
-                        }
                     } else {
                         this.timecardIdx.push(i);
                     }
                 }
             }
         },
-        cardWidthCalculator(idx: number): string {
-            if ((idx !== 0) && (idx === this.timecardIdx[0])) {
-                return (`${((this.entries[idx].End / 1000 - this.barCount * this.secPerBar) * this.secToPx).toString()}px`);
-            } if (this.entries[idx].End > (this.barCount + 3.0) * this.secPerBar * 1000) {
-                return (`${(((this.barCount + 3.0) * this.secPerBar - this.entries[idx].Time / 1000) * this.secToPx).toString()}px`);
-            }
-            return (`${(((this.entries[idx].End - this.entries[idx].Time) / 1000) * this.secToPx).toString()}px`);
-        },
         rulerMouseLeave() {
             this.timelineActive = false;
         },
-        rulerMouseDown(event: any, idx: number, resizeSwitch: boolean) {
-            if (idx < 0) {
-                this.selectedEntry = 0;
-                this.timelineActive = true;
-                this.xPos = event.clientX;
-                this.resizeMode = false;
-                return;
-            }
+        rulerMouseDown(event: any, idx: number, resizeSwitch: number) {
             if (!this.timelineActive) {
                 this.selectedEntry = idx;
                 this.timelineActive = true;
@@ -1937,22 +1923,98 @@ export default {
         },
         rulerMouseMove(event: any) {
             if (this.timelineActive) {
-                if (this.resizeMode) {
-                    const a = this.entries[this.selectedEntry].End + ((event.clientX - this.xPos) / this.secToPx) * 1000;
-                    if (a - this.entries[this.selectedEntry].Time < 50) {
-                        this.timelineActive = false;
-                        return;
-                    }
-
-                    if (this.selectedEntry < this.entries.length - 1) {
-                        const b = this.entries[this.selectedEntry + 1].Time + ((event.clientX - this.xPos) / this.secToPx) * 1000;
-                        if (this.entries[this.selectedEntry + 1].End - b < 50) {
+                switch (this.resizeMode) {
+                    case 0: {
+                        const xChange = ((event.clientX - this.xPos) / this.secToPx) * 1000;
+                        if (this.entries[this.selectedEntry].Duration - xChange < 300) {
                             this.timelineActive = false;
                             return;
                         }
-                        this.entries[this.selectedEntry + 1].Time = b;
+
+                        if (this.entries[this.selectedEntry].Time + xChange < this.secPerBar * this.barCount * 1000) {
+                            this.timelineActive = false;
+                            return;
+                        }
+
+                        if (this.selectedEntry > 0) {
+                            if (this.entries[this.selectedEntry].Time + xChange < this.entries[this.selectedEntry - 1].Time + this.entries[this.selectedEntry - 1].Duration) {
+                                if (this.entries[this.selectedEntry - 1].Duration + xChange > 300) {
+                                    this.entries[this.selectedEntry - 1].Duration = this.entries[this.selectedEntry - 1].Duration + xChange;
+                                } else {
+                                    this.timelineActive = false;
+                                    return;
+                                }
+                            }
+                        }
+
+                        this.entries[this.selectedEntry].Duration -= xChange;
+                        this.entries[this.selectedEntry].Time += xChange;
+                        break;
                     }
-                    this.entries[this.selectedEntry].End = a;
+
+                    case 1: {
+                        const xChange = ((event.clientX - this.xPos) / this.secToPx) * 1000;
+                        if (this.entries[this.selectedEntry].Duration - xChange < 300) {
+                            this.timelineActive = false;
+                            return;
+                        }
+
+                        if (this.selectedEntry > 0) {
+                            if (this.entries[this.selectedEntry].Time + xChange < this.entries[this.selectedEntry - 1].Time + this.entries[this.selectedEntry - 1].Duration) {
+                                if (this.entries[this.selectedEntry - 1].Duration + xChange > 300) {
+                                    this.entries[this.selectedEntry - 1].Duration = this.entries[this.selectedEntry - 1].Duration + xChange;
+                                } else {
+                                    this.timelineActive = false;
+                                    return;
+                                }
+                            }
+                        }
+
+                        if (this.selectedEntry < this.entries.length - 1) {
+                            if (this.entries[this.selectedEntry].Time + this.entries[this.selectedEntry].Duration + xChange > this.entries[this.selectedEntry + 1].Time) {
+                                if (this.entries[this.selectedEntry + 1].Duration - xChange > 300) {
+                                    this.entries[this.selectedEntry + 1].Duration = this.entries[this.selectedEntry + 1].Duration - xChange;
+                                    this.entries[this.selectedEntry + 1].Time = this.entries[this.selectedEntry].Time + this.entries[this.selectedEntry].Duration + xChange;
+                                } else {
+                                    this.timelineActive = false;
+                                    return;
+                                }
+                            }
+                        }
+
+                        this.entries[this.selectedEntry].Time += xChange;
+                        break;
+                    }
+
+                    case 2: {
+                        const xChange = ((event.clientX - this.xPos) / this.secToPx) * 1000;
+                        if (this.entries[this.selectedEntry].Duration + xChange < 300) {
+                            this.timelineActive = false;
+                            return;
+                        }
+
+                        if (this.selectedEntry < this.entries.length - 1) {
+                            if (this.entries[this.selectedEntry].Time + this.entries[this.selectedEntry].Duration + xChange > this.entries[this.selectedEntry + 1].Time) {
+                                if (this.entries[this.selectedEntry + 1].Duration - xChange > 300) {
+                                    this.entries[this.selectedEntry + 1].Duration = this.entries[this.selectedEntry + 1].Duration - xChange;
+                                    this.entries[this.selectedEntry + 1].Time = this.entries[this.selectedEntry].Time + this.entries[this.selectedEntry].Duration + xChange;
+                                } else {
+                                    this.timelineActive = false;
+                                    return;
+                                }
+                            }
+                        }
+
+                        this.entries[this.selectedEntry].Duration += xChange;
+                        break;
+                    }
+
+                    default:
+                        break;
+                }
+
+                /*
+                if (this.resizeMode) {
                 } else if (this.selectedEntry !== 0) {
                     const a = this.entries[this.selectedEntry - 1].End + ((event.clientX - this.xPos) / this.secToPx) * 1000;
                     if (a - this.entries[this.selectedEntry - 1].Time < 50) {
@@ -1997,6 +2059,7 @@ export default {
                     this.entries[this.selectedEntry].End += ((event.clientX - this.xPos) / this.secToPx) * 1000;
                     this.reloadDisplayCards();
                 }
+                */
                 this.xPos = event.clientX;
             }
         },

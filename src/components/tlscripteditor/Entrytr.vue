@@ -19,7 +19,7 @@ export default {
             type: Number,
             default: 0,
         },
-        end: {
+        duration: {
             type: Number,
             default: 0,
         },
@@ -83,7 +83,7 @@ export default {
             return timeString;
         },
         timeStampEnd() {
-            let timeRaw = this.end;
+            let timeRaw = this.time + this.duration;
             let timeString = "";
 
             let t = Math.floor(timeRaw / 60 / 60 / 1000);

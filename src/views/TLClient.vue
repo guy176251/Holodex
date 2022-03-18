@@ -19,9 +19,25 @@
         <v-btn
           elevation="4"
           color="secondary"
+          @click="loadVideo()"
+        >
+          Load Video
+        </v-btn>
+        <v-btn
+          elevation="4"
+          color="secondary"
+          style="margin-left: 5px; margin-right:5px"
+          @click="unloadVideo()"
+        >
+          Unload Video
+        </v-btn>
+
+        <v-btn
+          elevation="4"
+          color="secondary"
           @click="modalMode = 4; modalNexus = true; activeURLStream = '';"
         >
-          Sync Chat
+          Load Chat
         </v-btn>
         <v-btn
           elevation="4"
@@ -29,7 +45,7 @@
           style="margin-left:5px"
           @click="modalMode = 5; modalNexus = true"
         >
-          UnSync Chat
+          Unload Chat
         </v-btn>
       </v-container>
     </v-card>
@@ -44,17 +60,32 @@
         Menu
       </v-btn>
       <div class="d-flex align-stretch flex-row" style="height:100%" @click="menuBool = false">
-        <v-card class="ChatOuterContainer grow" height="100%;" width="auto">
-          <v-container class="ChatInnerContainer d-flex flex-column">
-            <EnhancedEntry
-              v-for="(dt, index) in entries"
-              :key="index"
-              :time="dt.Time"
-              :stext="dt.SText"
-              :cc="dt.CC"
-              :oc="dt.OC"
+        <v-card class="d-flex flex-column grow" height="100%;" width="auto">
+          <v-card
+            v-if="vidPlayer"
+            height="50%"
+            class="d-flex flex-column"
+            outlined
+          >
+            <v-card
+              id="player"
+              height="100%"
+              width="100%"
             />
-          </v-container>
+          </v-card>
+          <v-divider />
+          <v-card class="d-flex flex-column ChatOuterContainer grow" height="100%;" width="auto">
+            <v-container class="ChatInnerContainer d-flex flex-column">
+              <EnhancedEntry
+                v-for="(dt, index) in entries"
+                :key="index"
+                :time="dt.Time"
+                :stext="dt.SText"
+                :cc="dt.CC"
+                :oc="dt.OC"
+              />
+            </v-container>
+          </v-card>
           <v-card v-if="profileDisplay" class="ProfileListCard d-flex flex-column">
             <span v-for="(prf, index) in profile" :key="index"><span v-if="index === profileIdx">> </span>{{ (index + 1) + '. ' + prf.Name }}</span>
           </v-card>
@@ -309,7 +340,7 @@
       <v-card v-if="modalMode === 4">
         <v-container>
           <v-card-title>
-            Sync chat
+            Load chat
           </v-card-title>
           <v-text-field v-model="activeURLStream" label="Stream Link" />
           <v-card-actions>
@@ -430,6 +461,7 @@ export default {
             colourTemp: "",
             // ------ MODAL --------
             modalNexus: true,
+            // FOR DEPLOY modalMode = 6;
             modalMode: 6,
             addProfileNameString: "",
             // ------ SETTING ------
@@ -439,6 +471,13 @@ export default {
             // ---- ACTIVE CHAT ----
             activeChat: [],
             activeURLStream: "",
+            // ---- ACTIVE VIDEO ----
+            activeURLInput: "",
+            vidType: "",
+            vidPlayer: false,
+            vidIframeEle: null,
+            player: null,
+            IFOrigin: "",
             // ---- PRIVILIGE CHECK ----
             loginStatusText: "Checking login status...",
             loginStatus: 0, // 0: check login status, 1: check TL privilege, 2: not applied, 3: application rejected, 4: banned
@@ -534,7 +573,7 @@ export default {
                 oc: this.profile[this.profileIdx].useOC ? this.profile[this.profileIdx].OC : "",
             }).then(({ status, data }) => {
                 if (status === 200) {
-                    console.log("SENT!");
+                    // console.log("SENT!");
                 } else {
                     this.entries.push({
                         Time: Date.now(),
@@ -568,6 +607,7 @@ export default {
             this.modalNexus = false;
             if (this.firstLoad) {
                 this.loadChat(this.mainStreamLink);
+                this.loadVideo();
                 this.collabLinks.forEach((e) => {
                     this.loadChat(e);
                 });
@@ -704,6 +744,208 @@ export default {
             }
         },
         //= ====================== ACTIVE CHAT CONTROLLER ======================
+
+        // ---------------------- VIDEO CONTROLLER ----------------------
+        loadVideo() {
+            this.vidPlayer = true;
+            const checker = setInterval(() => {
+                const PlayerDiv = document.getElementById("player");
+                if (PlayerDiv) {
+                    clearInterval(checker);
+                    const StreamURL = getVideoIDFromUrl(this.mainStreamLink);
+                    if (StreamURL) {
+                        this.vidType = StreamURL.type;
+                        switch (StreamURL.type) {
+                            case "twitch":
+                                this.loadVideoTW(StreamURL.id, true);
+                                break;
+
+                            case "twitch_vod":
+                                this.loadVideoTW(StreamURL.id, false);
+                                break;
+
+                            case "twitcast":
+                                this.setupIframeTC(StreamURL.id, StreamURL.id, true);
+                                break;
+
+                            case "twitcast_vod":
+                                this.setupIframeTC(StreamURL.id, StreamURL.channel.name, false);
+                                break;
+
+                            case "niconico":
+                                // niconico doesn't allow third party player hosting... at least for now...
+                                // this.setupIframeNC(StreamURL.id, true);
+                                break;
+
+                            case "niconico_vod":
+                                this.setupIframeNC(StreamURL.id, false);
+                                break;
+
+                            case "bilibili":
+                                // bilibili live player is flash -> the one in FLASH link in the share button
+                                // https://s1.hdslb.com/bfs/static/blive/live-assets/player/flash/pageplayer-latest.swf?room_id=0&cid=xxxxxx&state=LIVE
+                                break;
+
+                            case "bilibili_vod":
+                                this.setupIframeBL(StreamURL.id);
+                                break;
+
+                            default:
+                                this.loadVideoYT(StreamURL.id);
+                                break;
+                        }
+                    }
+                }
+            }, 1000);
+        },
+        unloadVideo() {
+            this.vidPlayer = false;
+        },
+        setupIframeTC(MID: string, UID: string, Live: boolean): void {
+            if (this.vidIframeEle) {
+                this.vidIframeEle.parentNode?.removeChild(this.vidIframeEle);
+            }
+            this.vidIframeEle = document.createElement("iframe");
+            if (Live) {
+                this.vidIframeEle.src = `https://twitcasting.tv/${UID}/embeddedplayer/live?auto_play=false&default_mute=false`;
+                this.vidIframeEle.loading = "lazy";
+            } else {
+                this.vidIframeEle.src = `https://twitcasting.tv/${UID}/embeddedplayer/${MID}?auto_play=false&default_mute=false`;
+            }
+            this.vidIframeEle.width = "100%";
+            this.vidIframeEle.height = "100%";
+            this.vidIframeEle.frameBorder = "0";
+
+            this.loadIframe("TC");
+        },
+        setupIframeBL(VID: string): void {
+            let embedID = "";
+            if (this.vidIframeEle) {
+                this.vidIframeEle.parentNode?.removeChild(this.vidIframeEle);
+            }
+
+            switch (VID.slice(0, 2).toLowerCase()) {
+                case "bv":
+                    embedID = `bvid=${VID.slice(2)}`;
+                    break;
+
+                case "av":
+                    embedID = `aid=${VID.slice(2)}`;
+                    break;
+
+                default:
+                    embedID = `cid=${VID}`;
+                    break;
+            }
+
+            this.vidIframeEle = document.createElement("iframe");
+            this.vidIframeEle.src = `https://player.bilibili.com/player.html?${embedID}&page=1&as_wide=1&high_quality=0&danmaku=0`;
+            this.vidIframeEle.width = "100%";
+            this.vidIframeEle.height = "100%";
+            this.vidIframeEle.frameBorder = "0";
+
+            this.loadIframe("BL");
+        },
+        setupIframeNC(VID: string, Live: boolean): void {
+            if (this.vidIframeEle) {
+                this.vidIframeEle.parentNode?.removeChild(this.vidIframeEle);
+            }
+
+            this.vidIframeEle = document.createElement("iframe");
+            if (Live) {
+                this.vidIframeEle.src = `https://live.nicovideo.jp/embed/${VID}`;
+            } else {
+                this.vidIframeEle.src = `https://embed.nicovideo.jp/watch/${VID}?autoplay=0`;
+            }
+            this.vidIframeEle.width = "100%";
+            this.vidIframeEle.height = "100%";
+            this.vidIframeEle.frameBorder = "0";
+            this.vidIframeEle.allow = "encrypted-media;";
+
+            this.loadIframe("NC");
+        },
+
+        // -----------------  IFRAME  -----------------
+        loadIframe(): void {
+            if (this.vidIframeEle) {
+                const PlayerDiv = document.getElementById("player");
+                if (PlayerDiv) {
+                    PlayerDiv.append(this.vidIframeEle);
+                }
+            }
+        },
+        //= ================  IFRAME  =================
+
+        // -----------------  YT  -----------------
+        loadVideoYT(VID: string) {
+            if (window.YT) {
+                this.startVideoYT(VID);
+                return;
+            }
+
+            const tag = document.createElement("script");
+            tag.src = "https://www.youtube.com/iframe_api";
+            const firstScriptTag = document.getElementsByTagName("script")[0];
+            if (firstScriptTag.parentNode) {
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            }
+
+            window.onYouTubeIframeAPIReady = () => this.startVideoYT(VID);
+        },
+        startVideoYT(VID: string) {
+            this.player = new window.YT.Player("player", {
+                videoId: VID,
+                playerVars: {
+                    playsinline: 1,
+                },
+            });
+        },
+        //= ================  YT  =================
+
+        // -----------------  TW  -----------------
+        loadVideoTW(VID:string, Live: boolean) {
+            this.startTWTracker();
+            if (window.Twitch) {
+                this.startVideoTW(VID, Live);
+                return;
+            }
+
+            const tag = document.createElement("script");
+            tag.src = "https://player.twitch.tv/js/embed/v1.js";
+            const firstScriptTag = document.getElementsByTagName("script")[0];
+            if (firstScriptTag.parentNode) {
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            }
+
+            const Checker = setInterval(() => {
+                if (window.Twitch) {
+                    clearInterval(Checker);
+                    this.startVideoTW(VID, Live);
+                }
+            }, 1000);
+        },
+        startVideoTW(VID: string, Live: boolean) {
+            if (Live) {
+                this.player = new window.Twitch.Player("player", {
+                    width: "100%",
+                    height: "100%",
+                    channel: VID,
+                    autoplay: false,
+                    time: "0h0m0s",
+                });
+            } else {
+                this.player = new window.Twitch.Player("player", {
+                    width: "100%",
+                    height: "100%",
+                    video: VID,
+                    autoplay: false,
+                    time: "0h0m0s",
+                });
+            }
+        },
+        //= ================  TW  =================
+        //= ====================== VIDEO CONTROLLER ======================
+
         colourPickerClose() {
             if (this.colourPick === 1) {
                 this.profile[this.profileIdx].CC = this.colourTemp;

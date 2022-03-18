@@ -147,7 +147,7 @@
             class="d-flex flex-row justify-center"
           >
             <EnhancedEntry
-              v-if="displayEntry >= 0"
+              v-if="displayEntry >= 0 && displayEntry < entries.length"
               :stext="entries[displayEntry].SText"
               :cc="profile[entries[displayEntry].Profile].useCC ? profile[entries[displayEntry].Profile].CC : ''"
               :oc="profile[entries[displayEntry].Profile].useOC ? profile[entries[displayEntry].Profile].OC : ''"
@@ -1223,7 +1223,7 @@ export default {
 
                 this.player.removeEventListener(window.Twitch.Player.SEEK, (e: any) => {
                     this.timerTime = e.position * 1000;
-                    // this.ScrollCalculator();
+                    this.scrollCalculator();
                 });
             }
         },
@@ -1371,7 +1371,7 @@ export default {
                 if (e.data.n === "SyncHolodex") {
                     if (typeof e.data.d === "number") {
                         this.timerTime = e.data.d;
-                        // this.ScrollCalculator();
+                        this.scrollCalculator();
                     }
                 }
             }
@@ -1471,7 +1471,7 @@ export default {
 
             this.player.addEventListener(window.Twitch.Player.SEEK, (e: any) => {
                 this.timerTime = e.position * 1000;
-                // this.ScrollCalculator();
+                this.scrollCalculator();
             });
         },
         startTWTracker() {
